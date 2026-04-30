@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path_provider/path_provider.dart';
-import '../providers/config_provider.dart';
+import 'package:llm_proxy/providers/config_provider.dart';
 
 /// 在 macOS 上使用 osascript 打开原生文件夹选择对话框
 Future<String?> _pickDirectory() async {

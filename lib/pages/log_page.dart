@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../providers/log_provider.dart';
-import '../models/proxy_log.dart';
+import 'package:llm_proxy/providers/log_provider.dart';
+import 'package:llm_proxy/models/proxy_log.dart';
 
 class LogPage extends StatelessWidget {
   const LogPage({super.key});
@@ -24,8 +25,8 @@ class LogPage extends StatelessWidget {
       ),
       body: Consumer<LogProvider>(
         builder: (context, logProvider, child) {
-          final logs = logProvider.logs;
-          if (logs.isEmpty) {
+          final count = logProvider.logCount;
+          if (count == 0) {
             return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -42,9 +43,9 @@ class LogPage extends StatelessWidget {
           }
           
           return ListView.builder(
-            itemCount: logs.length,
+            itemCount: count,
             itemBuilder: (context, index) {
-              final log = logs[index];
+              final log = logProvider.getLog(index);
               return _buildLogItem(context, log);
             },
           );
@@ -54,15 +55,27 @@ class LogPage extends StatelessWidget {
   }
 
   Widget _buildLogItem(BuildContext context, ProxyLog log) {
-    Color statusColor = Colors.grey;
-    if (log.statusCode != null) {
+    // 根据日志状态决定颜色
+    Color statusColor;
+    String statusText;
+
+    if (log.status == LogStatus.pending) {
+      statusColor = Colors.orange;
+      statusText = '...';
+    } else if (log.statusCode != null) {
+      statusText = '${log.statusCode}';
       if (log.statusCode! >= 200 && log.statusCode! < 300) {
         statusColor = Colors.green;
       } else if (log.statusCode! >= 400 && log.statusCode! < 500) {
         statusColor = Colors.orange;
       } else if (log.statusCode! >= 500) {
         statusColor = Colors.red;
+      } else {
+        statusColor = Colors.grey;
       }
+    } else {
+      statusColor = Colors.red;
+      statusText = 'ERR';
     }
 
     return Card(
@@ -71,18 +84,34 @@ class LogPage extends StatelessWidget {
       child: ExpansionTile(
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: statusColor),
+            // 状态码 / 加载指示器
+            if (log.status == LogStatus.pending)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.orange),
+                ),
+                child: const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orange),
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: statusColor),
+                ),
+                child: Text(
+                  statusText,
+                  style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
+                ),
               ),
-              child: Text(
-                '${log.statusCode ?? "ERR"}',
-                style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
-              ),
-            ),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -103,10 +132,14 @@ class LogPage extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            Text(
-              '${log.requestDurationMs}ms',
-              style: const TextStyle(color: Colors.grey, fontSize: 12),
-            ),
+            // pending 时显示实时耗时，完成后显示耗时
+            if (log.status == LogStatus.pending)
+              _PendingDuration(startTime: log.time)
+            else
+              Text(
+                '${log.requestDurationMs}ms',
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
           ],
         ),
         subtitle: Padding(
@@ -151,6 +184,45 @@ class LogPage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 实时显示 pending 请求已消耗的时间（ms）
+class _PendingDuration extends StatefulWidget {
+  final DateTime startTime;
+  const _PendingDuration({required this.startTime});
+
+  @override
+  State<_PendingDuration> createState() => _PendingDurationState();
+}
+
+class _PendingDurationState extends State<_PendingDuration> {
+  late Timer _timer;
+  late int _elapsedMs;
+
+  @override
+  void initState() {
+    super.initState();
+    _elapsedMs = DateTime.now().difference(widget.startTime).inMilliseconds;
+    _timer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      setState(() {
+        _elapsedMs = DateTime.now().difference(widget.startTime).inMilliseconds;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '$_elapsedMs ms',
+      style: const TextStyle(color: Colors.orange, fontSize: 12),
     );
   }
 }

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/proxy_rule.dart';
-import '../services/proxy_server.dart';
-import 'log_provider.dart';
+import 'package:llm_proxy/models/proxy_rule.dart';
+import 'package:llm_proxy/models/proxy_log.dart';
+import 'package:llm_proxy/services/proxy_server.dart';
+import 'package:llm_proxy/providers/log_provider.dart';
 
 /// 配置管理状态提供者，用于持久化存储数据骨架
 class ConfigProvider extends ChangeNotifier {
@@ -66,6 +67,11 @@ class ConfigProvider extends ChangeNotifier {
       },
       onProxyLog: (proxyLog) {
         logProvider?.addLog(proxyLog);
+      },
+      onProxyLogUpdate: (proxyLog) {
+        // 中间状态（仍为 pending）静默更新，不触发 UI 重建
+        final silent = proxyLog.status == LogStatus.pending;
+        logProvider?.updateLog(proxyLog, silent: silent);
       },
     );
     _init();

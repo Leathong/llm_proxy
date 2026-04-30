@@ -3,29 +3,38 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 
-import '../models/proxy_rule.dart';
-import '../models/proxy_log.dart';
-import 'proxy_log_writer.dart';
+import 'package:llm_proxy/models/proxy_rule.dart';
+import 'package:llm_proxy/models/proxy_log.dart';
+import 'package:llm_proxy/services/proxy_log_writer.dart';
 
 class ProxyServer {
   HttpServer? _server;
   bool get isRunning => _server != null;
   int _port = 8080;
 
-  // 依赖外部传入规则获取逻辑
+  // 自增 ID，用于为每条日志分配唯一标识
+  int _logIdCounter = 0;
+
   final List<ProxyRule> Function() getRules;
   final void Function(String message)? onLog;
   final void Function(ProxyLog proxyLog)? onProxyLog;
+  // 新增：日志更新回调，用于请求完成后刷新已有日志条目
+  final void Function(ProxyLog proxyLog)? onProxyLogUpdate;
   final ProxyLogWriter _logWriter = ProxyLogWriter();
 
-  ProxyServer({required this.getRules, this.onLog, this.onProxyLog});
+  ProxyServer({
+    required this.getRules,
+    this.onLog,
+    this.onProxyLog,
+    this.onProxyLogUpdate,
+  });
 
-  /// 设置日志文件路径（空路径表示不记录）
+  String _nextLogId() => 'log_${++_logIdCounter}';
+
   void setLogFilePath(String path) {
     _logWriter.setLogFilePath(path);
   }
 
-  /// 启动代理服务器
   Future<void> start({int port = 8080, String? certPath, String? keyPath}) async {
     if (isRunning) return;
     _port = port;
@@ -63,7 +72,6 @@ class ProxyServer {
     }
   }
 
-  /// 停止代理服务器
   Future<void> stop() async {
     if (!isRunning) return;
     await _server!.close(force: true);
@@ -81,7 +89,6 @@ class ProxyServer {
 
   Future<void> _handleRequest(HttpRequest request) async {
     try {
-      // 允许跨域
       _setCorsHeaders(request.response);
       if (request.method == 'OPTIONS') {
         request.response.statusCode = HttpStatus.ok;
@@ -97,7 +104,6 @@ class ProxyServer {
       } else if (path.endsWith('/v1/chat/completions')) {
         await _handleChatCompletionsRequest(request);
       } else {
-        // 未拦截的请求，返回 404
         request.response.statusCode = HttpStatus.notFound;
         request.response.write('Not Found');
         await request.response.close();
@@ -120,7 +126,6 @@ class ProxyServer {
     response.headers.add('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization');
   }
 
-  /// 拦截 /v1/models 请求
   Future<void> _handleModelsRequest(HttpRequest request) async {
     final startTime = DateTime.now();
     final rules = getRules().where((r) => r.active).toList();
@@ -141,6 +146,7 @@ class ProxyServer {
     request.response.write(responseStr);
     await request.response.close();
     _log('已返回可用模型列表: ${models.map((m) => m['id']).join(', ')}');
+    // models 请求较快，直接以 completed 状态 emit
     _emitLog(
       time: startTime,
       method: request.method,
@@ -148,7 +154,6 @@ class ProxyServer {
       model: models.map((m) => m['id']).join(', '),
       statusCode: 200,
     );
-    // 写入日志文件
     _logWriter.writeLog(
       time: startTime,
       method: request.method,
@@ -160,24 +165,30 @@ class ProxyServer {
     );
   }
 
-  /// 拦截 /v1/chat/completions 请求并转发
   Future<void> _handleChatCompletionsRequest(HttpRequest request) async {
     final startTime = DateTime.now();
+    final logId = _nextLogId();
     String? responseBodyStr;
 
-    // 提前声明用于 finally 的变量，以便在退出时写入日志
     int? finalStatusCode;
     String? finalError;
+
+    // 立即发出 pending 状态日志，让 UI 显示"请求中"
+    _emitPendingLog(
+      id: logId,
+      time: startTime,
+      method: request.method,
+      path: request.uri.path,
+    );
 
     try {
       if (request.method != 'POST') {
         request.response.statusCode = HttpStatus.methodNotAllowed;
         await request.response.close();
-        _emitLog(
-          time: startTime,
-          method: request.method,
-          path: request.uri.path,
-          statusCode: HttpStatus.methodNotAllowed,
+        _updateLog(
+          id: logId, time: startTime, method: request.method,
+          path: request.uri.path, statusCode: HttpStatus.methodNotAllowed,
+          status: LogStatus.error, error: 'Method not allowed',
         );
         _logWriter.writeLog(
           time: startTime, method: request.method, path: request.uri.path,
@@ -187,15 +198,15 @@ class ProxyServer {
         return;
       }
 
-      // 读取请求体
       final bodyString = await utf8.decoder.bind(request).join();
       if (bodyString.isEmpty) {
         request.response.statusCode = HttpStatus.badRequest;
         request.response.write('Empty body');
         await request.response.close();
-        _emitLog(
-          time: startTime, method: request.method, path: request.uri.path,
-          statusCode: HttpStatus.badRequest, error: 'Empty body',
+        _updateLog(
+          id: logId, time: startTime, method: request.method,
+          path: request.uri.path, statusCode: HttpStatus.badRequest,
+          status: LogStatus.error, error: 'Empty body',
         );
         _logWriter.writeLog(
           time: startTime, method: request.method, path: request.uri.path,
@@ -213,9 +224,10 @@ class ProxyServer {
         request.response.statusCode = HttpStatus.badRequest;
         request.response.write('Invalid JSON');
         await request.response.close();
-        _emitLog(
-          time: startTime, method: request.method, path: request.uri.path,
-          statusCode: HttpStatus.badRequest, error: 'Invalid JSON',
+        _updateLog(
+          id: logId, time: startTime, method: request.method,
+          path: request.uri.path, statusCode: HttpStatus.badRequest,
+          status: LogStatus.error, error: 'Invalid JSON',
         );
         _logWriter.writeLog(
           time: startTime, method: request.method, path: request.uri.path,
@@ -230,9 +242,10 @@ class ProxyServer {
         request.response.statusCode = HttpStatus.badRequest;
         request.response.write('Missing model parameter');
         await request.response.close();
-        _emitLog(
-          time: startTime, method: request.method, path: request.uri.path,
-          statusCode: HttpStatus.badRequest, error: 'Missing model parameter',
+        _updateLog(
+          id: logId, time: startTime, method: request.method,
+          path: request.uri.path, statusCode: HttpStatus.badRequest,
+          status: LogStatus.error, error: 'Missing model parameter',
         );
         _logWriter.writeLog(
           time: startTime, method: request.method, path: request.uri.path,
@@ -242,7 +255,13 @@ class ProxyServer {
         return;
       }
 
-      // 查找匹配的规则
+      // 解析到 model 后，更新 pending 日志的 model 信息
+      _updateLog(
+        id: logId, time: startTime, method: request.method,
+        path: request.uri.path, model: requestedModelId,
+        status: LogStatus.pending,
+      );
+
       final rule = getRules().where((r) => r.active).cast<ProxyRule?>().firstWhere(
         (r) => r?.customModelId == requestedModelId,
         orElse: () => null,
@@ -259,9 +278,10 @@ class ProxyServer {
         request.response.write(errorResp);
         await request.response.close();
         _log('未找到匹配的活跃规则，模型: $requestedModelId');
-        _emitLog(
-          time: startTime, method: request.method, path: request.uri.path,
-          model: requestedModelId, statusCode: HttpStatus.notFound,
+        _updateLog(
+          id: logId, time: startTime, method: request.method,
+          path: request.uri.path, model: requestedModelId,
+          statusCode: HttpStatus.notFound, status: LogStatus.error,
           error: 'Model not found',
         );
         _logWriter.writeLog(
@@ -275,11 +295,8 @@ class ProxyServer {
 
       _log('匹配到规则: ${rule.name}, 转发至 ${rule.endpoint}');
 
-      // 替换为目标模型 ID
       bodyJson['model'] = rule.targetModelId;
 
-      // 从 URL 查询参数中提取 thinking 参数，优先级高于规则配置
-      // 参数格式: ?thinking=high 或 ?thinking=max
       String? thinkingParam;
       String? reasoningParam;
       final queryParams = request.uri.queryParameters;
@@ -292,7 +309,6 @@ class ProxyServer {
         }
       }
 
-      // 注入思考模式参数（URL 参数优先）
       if (thinkingParam != null) {
         bodyJson['thinking'] = {'type': thinkingParam};
         bodyJson['reasoning_effort'] = reasoningParam;
@@ -301,7 +317,6 @@ class ProxyServer {
           bodyJson['thinking'] = {'type': rule.thinkingMode};
           _log('注入 thinking: ${rule.thinkingMode}');
         }
-        // 仅在 thinking 启用时（值为 enabled）才注入 reasoning_effort
         if (rule.thinkingMode == 'enabled') {
           if (rule.reasoningEffort.isNotEmpty) {
             bodyJson['reasoning_effort'] = rule.reasoningEffort;
@@ -313,7 +328,6 @@ class ProxyServer {
       final modifiedBodyStr = jsonEncode(bodyJson);
       final newBodyBytes = utf8.encode(modifiedBodyStr);
 
-      // 构造目标 URL
       var targetUrl = rule.endpoint;
       if (!targetUrl.endsWith('/v1/chat/completions')) {
         if (targetUrl.endsWith('/')) {
@@ -323,13 +337,19 @@ class ProxyServer {
         }
       }
 
+      // 更新日志：补充转发目标信息
+      _updateLog(
+        id: logId, time: startTime, method: request.method,
+        path: request.uri.path, model: requestedModelId,
+        targetEndpoint: targetUrl, status: LogStatus.pending,
+      );
+
       final uri = Uri.parse(targetUrl);
       final client = HttpClient();
 
       try {
         final targetRequest = await client.postUrl(uri);
 
-        // 复制请求头
         request.headers.forEach((name, values) {
           if (name.toLowerCase() == 'host' ||
               name.toLowerCase() == 'content-length' ||
@@ -341,7 +361,6 @@ class ProxyServer {
           }
         });
 
-        // 设置 Authorization
         if (rule.apiKey.isNotEmpty) {
           targetRequest.headers.add('Authorization', 'Bearer ${rule.apiKey}');
         } else {
@@ -361,7 +380,6 @@ class ProxyServer {
         request.response.statusCode = targetResponse.statusCode;
         finalStatusCode = targetResponse.statusCode;
 
-        // 复制响应头
         targetResponse.headers.forEach((name, values) {
           if (name.toLowerCase() == 'transfer-encoding') return;
           for (var value in values) {
@@ -369,20 +387,21 @@ class ProxyServer {
           }
         });
 
-        // 读取响应体并透传（捕获完整响应内容用于日志）
         final responseBytes = await targetResponse.toList();
         final allBytes = responseBytes.expand((b) => b).toList();
         responseBodyStr = utf8.decode(allBytes);
 
-        // 写入客户端响应
         request.response.add(allBytes);
         await request.response.close();
         _log('请求转发完成，状态码: ${targetResponse.statusCode}');
 
-        _emitLog(
-          time: startTime, method: request.method, path: request.uri.path,
-          model: requestedModelId, targetEndpoint: targetUrl,
-          statusCode: targetResponse.statusCode,
+        // 请求完成，更新日志状态为 completed
+        final isError = targetResponse.statusCode >= 400;
+        _updateLog(
+          id: logId, time: startTime, method: request.method,
+          path: request.uri.path, model: requestedModelId,
+          targetEndpoint: targetUrl, statusCode: targetResponse.statusCode,
+          status: isError ? LogStatus.error : LogStatus.completed,
         );
       } catch (e) {
         _log('转发请求失败: $e');
@@ -403,17 +422,17 @@ class ProxyServer {
           _log('响应关闭异常: $err');
         }
 
-        _emitLog(
-          time: startTime, method: request.method, path: request.uri.path,
-          model: requestedModelId, targetEndpoint: targetUrl,
+        _updateLog(
+          id: logId, time: startTime, method: request.method,
+          path: request.uri.path, model: requestedModelId,
+          targetEndpoint: targetUrl,
           statusCode: finalStatusCode ?? HttpStatus.badGateway,
-          error: e.toString(),
+          status: LogStatus.error, error: e.toString(),
         );
       } finally {
         client.close();
       }
 
-      // 写入日志文件（含请求体和响应体）
       _logWriter.writeLog(
         time: startTime, method: request.method, path: request.uri.path,
         requestBody: modifiedBodyStr, statusCode: finalStatusCode ?? 0,
@@ -422,9 +441,13 @@ class ProxyServer {
         requestDurationMs: DateTime.now().difference(startTime).inMilliseconds,
       );
     } catch (e) {
-      // 最外层兜底
       _log('处理请求出错: $e');
       finalError = e.toString();
+      _updateLog(
+        id: logId, time: startTime, method: request.method,
+        path: request.uri.path, statusCode: HttpStatus.internalServerError,
+        status: LogStatus.error, error: e.toString(),
+      );
       try {
         request.response.statusCode = HttpStatus.internalServerError;
         request.response.write('Internal Server Error: $e');
@@ -435,6 +458,57 @@ class ProxyServer {
     }
   }
 
+  /// 发出 pending 状态的日志（请求刚发起）
+  void _emitPendingLog({
+    required String id,
+    required DateTime time,
+    required String method,
+    required String path,
+  }) {
+    if (onProxyLog != null) {
+      onProxyLog!(
+        ProxyLog(
+          id: id,
+          time: time,
+          method: method,
+          path: path,
+          status: LogStatus.pending,
+        ),
+      );
+    }
+  }
+
+  /// 更新已有日志条目（请求完成 / 出错时调用）
+  void _updateLog({
+    required String id,
+    required DateTime time,
+    required String method,
+    required String path,
+    String? model,
+    String? targetEndpoint,
+    int? statusCode,
+    String? error,
+    LogStatus status = LogStatus.completed,
+  }) {
+    if (onProxyLogUpdate != null) {
+      onProxyLogUpdate!(
+        ProxyLog(
+          id: id,
+          time: time,
+          method: method,
+          path: path,
+          model: model,
+          targetEndpoint: targetEndpoint,
+          statusCode: statusCode,
+          error: error,
+          requestDurationMs: DateTime.now().difference(time).inMilliseconds,
+          status: status,
+        ),
+      );
+    }
+  }
+
+  /// 直接 emit 已完成的日志（用于 models 等快速请求）
   void _emitLog({
     required DateTime time,
     required String method,
@@ -447,6 +521,7 @@ class ProxyServer {
     if (onProxyLog != null) {
       onProxyLog!(
         ProxyLog(
+          id: _nextLogId(),
           time: time,
           method: method,
           path: path,
@@ -455,6 +530,7 @@ class ProxyServer {
           statusCode: statusCode,
           error: error,
           requestDurationMs: DateTime.now().difference(time).inMilliseconds,
+          status: LogStatus.completed,
         ),
       );
     }

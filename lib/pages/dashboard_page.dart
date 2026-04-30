@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/config_provider.dart';
+import 'package:llm_proxy/providers/config_provider.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});

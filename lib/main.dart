@@ -5,12 +5,12 @@ import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:tray_manager/tray_manager.dart';
 
-import 'providers/config_provider.dart';
-import 'providers/log_provider.dart';
-import 'pages/dashboard_page.dart';
-import 'pages/config_page.dart';
-import 'pages/log_page.dart';
-import 'pages/settings_page.dart';
+import 'package:llm_proxy/providers/config_provider.dart';
+import 'package:llm_proxy/providers/log_provider.dart';
+import 'package:llm_proxy/pages/dashboard_page.dart';
+import 'package:llm_proxy/pages/config_page.dart';
+import 'package:llm_proxy/pages/log_page.dart';
+import 'package:llm_proxy/pages/settings_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
