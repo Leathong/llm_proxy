@@ -4,7 +4,7 @@ import 'package:llm_proxy/features/logs/presentation/widgets/file_log_detail.dar
 
 /// 单条日志条目，展开后点击空白区域可收起
 class FileLogItem extends StatefulWidget {
-  final LogOutputEntry entry;
+  final FileLogEntry entry;
 
   const FileLogItem({super.key, required this.entry});
 
@@ -16,7 +16,7 @@ class _FileLogItemState extends State<FileLogItem> {
   final _controller = ExpansibleController();
   final _key = GlobalKey();
 
-  LogOutputEntry get entry => widget.entry;
+  FileLogEntry get entry => widget.entry;
 
   @override
   void dispose() {

@@ -3,7 +3,7 @@ import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 
 /// 响应内容块列表
 class ResponseContent extends StatelessWidget {
-  final List<LogOutputContentBlock> content;
+  final List<FileLogContentBlock> content;
 
   const ResponseContent({super.key, required this.content});
 

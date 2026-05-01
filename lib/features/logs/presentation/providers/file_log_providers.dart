@@ -6,26 +6,26 @@ import 'package:llm_proxy/features/logs/data/datasources/log_file_parser.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 
 /// 日志输出文件的加载状态
-class LogOutputState {
-  final List<LogOutputEntry> entries;
+class FileLogState {
+  final List<FileLogEntry> entries;
   final String? filePath;
   final String? error;
   final bool isLoading;
 
-  const LogOutputState({
+  const FileLogState({
     this.entries = const [],
     this.filePath,
     this.error,
     this.isLoading = false,
   });
 
-  LogOutputState copyWith({
-    List<LogOutputEntry>? entries,
+  FileLogState copyWith({
+    List<FileLogEntry>? entries,
     String? filePath,
     String? error,
     bool? isLoading,
   }) {
-    return LogOutputState(
+    return FileLogState(
       entries: entries ?? this.entries,
       filePath: filePath ?? this.filePath,
       error: error,
@@ -35,9 +35,9 @@ class LogOutputState {
 }
 
 /// 管理日志输出文件的加载、解析
-class LogOutputNotifier extends Notifier<LogOutputState> {
+class FileLogNotifier extends Notifier<FileLogState> {
   @override
-  LogOutputState build() => const LogOutputState();
+  FileLogState build() => const FileLogState();
 
   /// 从指定路径加载日志文件（自动识别 .log 和 .json 格式）
   Future<void> loadFile(String path) async {
@@ -49,7 +49,7 @@ class LogOutputNotifier extends Notifier<LogOutputState> {
         return;
       }
 
-      final List<LogOutputEntry> entries;
+      final List<FileLogEntry> entries;
 
       if (path.endsWith('.log')) {
         // .log 文本文件：使用内置解析器（Isolate 中执行）
@@ -60,11 +60,11 @@ class LogOutputNotifier extends Notifier<LogOutputState> {
         final list = jsonDecode(content) as List<dynamic>;
         entries = [
           for (var i = 0; i < list.length; i++)
-            LogOutputEntry.fromJson(list[i] as Map<String, dynamic>, i),
+            FileLogEntry.fromJson(list[i] as Map<String, dynamic>, i),
         ];
       }
 
-      state = LogOutputState(
+      state = FileLogState(
         entries: entries,
         filePath: path,
       );
@@ -75,9 +75,9 @@ class LogOutputNotifier extends Notifier<LogOutputState> {
 
   /// 清空已加载的日志
   void clear() {
-    state = const LogOutputState();
+    state = const FileLogState();
   }
 }
 
 final logOutputProvider =
-    NotifierProvider<LogOutputNotifier, LogOutputState>(LogOutputNotifier.new);
+    NotifierProvider<FileLogNotifier, FileLogState>(FileLogNotifier.new);

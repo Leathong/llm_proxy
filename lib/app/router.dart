@@ -50,7 +50,7 @@ final GoRouter appRouter = GoRouter(
           path: '/log-output',
           name: 'log-output',
           pageBuilder: (context, state) => _noTransitionPageBuilder(
-            context, state, const LogOutputPage(),
+            context, state, const FileLogPage(),
           ),
         ),
         GoRoute(

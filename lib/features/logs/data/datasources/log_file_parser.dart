@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 
-/// 将 .log 文本文件解析为结构化的 [LogOutputEntry] 列表。
+/// 将 .log 文本文件解析为结构化的 [FileLogEntry] 列表。
 /// 支持 Anthropic 和 OpenAI 的 SSE 流式响应拼接。
 class LogFileParser {
   // 匹配分隔线: -------------------- 2026-05-01 10:14:53 --------------------
@@ -20,22 +20,22 @@ class LogFileParser {
   static final _statusRe = RegExp(r'^\[Status\]\s+(\d+)$');
 
   /// 解析 .log 文件，在 Isolate 中执行以避免阻塞 UI
-  static Future<List<LogOutputEntry>> parseFile(String filePath) async {
+  static Future<List<FileLogEntry>> parseFile(String filePath) async {
     final content = await File(filePath).readAsString();
     return compute(_parseContent, content);
   }
 
   /// Isolate 入口：解析日志文本内容
-  static List<LogOutputEntry> _parseContent(String content) {
+  static List<FileLogEntry> _parseContent(String content) {
     final rawEntries = _splitLogEntries(content);
-    final results = <LogOutputEntry>[];
+    final results = <FileLogEntry>[];
 
     for (var i = 0; i < rawEntries.length; i++) {
       try {
         results.add(_parseLogEntry(rawEntries[i], i));
       } catch (e) {
         // 解析失败时创建一条最小记录
-        results.add(LogOutputEntry(
+        results.add(FileLogEntry(
           timestamp: rawEntries[i].timestamp,
           method: 'UNKNOWN',
           path: '解析失败: $e',
@@ -79,11 +79,11 @@ class LogFileParser {
 
   // ==================== 单条日志解析 ====================
 
-  static LogOutputEntry _parseLogEntry(_RawEntry raw, int index) {
+  static FileLogEntry _parseLogEntry(_RawEntry raw, int index) {
     final (meta, bodyStart) = _parseMetadata(raw.lines);
     final (reqRaw, respRaw) = _splitRequestResponse(raw.lines, bodyStart);
 
-    return LogOutputEntry(
+    return FileLogEntry(
       timestamp: raw.timestamp,
       method: meta['method'] as String? ?? 'UNKNOWN',
       path: meta['path'] as String? ?? '',
@@ -163,7 +163,7 @@ class LogFileParser {
 
   // ==================== 请求体解析 ====================
 
-  static LogOutputRequest? _parseRequestBody(String raw) {
+  static FileLogRequest? _parseRequestBody(String raw) {
     if (raw.isEmpty) return null;
 
     Map<String, dynamic> body;
@@ -173,7 +173,7 @@ class LogFileParser {
       return null;
     }
 
-    final messages = <LogOutputMessage>[];
+    final messages = <FileLogMessage>[];
     if (body['messages'] is List) {
       for (final msg in body['messages'] as List) {
         if (msg is Map<String, dynamic>) {
@@ -195,7 +195,7 @@ class LogFileParser {
       ..remove('system')
       ..remove('tools');
 
-    return LogOutputRequest(
+    return FileLogRequest(
       model: body['model'] as String?,
       stream: body['stream'] as bool?,
       messages: messages,
@@ -230,16 +230,16 @@ class LogFileParser {
   }
 
   /// 提取工具定义列表（仅保留名称和描述摘要）
-  static List<LogOutputToolDef>? _extractToolDefs(dynamic tools) {
+  static List<FileLogToolDef>? _extractToolDefs(dynamic tools) {
     if (tools is! List || tools.isEmpty) return null;
 
-    final result = <LogOutputToolDef>[];
+    final result = <FileLogToolDef>[];
     for (final tool in tools) {
       if (tool is! Map<String, dynamic>) continue;
       final name = tool['name'] as String? ?? '';
       final desc = tool['description'] as String?;
       final inputSchema = tool['input_schema'] as Map<String, dynamic>?;
-      result.add(LogOutputToolDef(
+      result.add(FileLogToolDef(
         name: name,
         descriptionPreview: desc != null ? _truncate(desc, 100) : null,
         description: desc,
@@ -250,18 +250,18 @@ class LogFileParser {
     return result.isNotEmpty ? result : null;
   }
 
-  static LogOutputMessage _simplifyMessage(Map<String, dynamic> msg) {
+  static FileLogMessage _simplifyMessage(Map<String, dynamic> msg) {
     final role = msg['role'] as String? ?? 'unknown';
     final content = msg['content'];
 
     if (content is String) {
-      return LogOutputMessage(role: role, text: _truncate(content, 500));
+      return FileLogMessage(role: role, text: _truncate(content, 500));
     }
 
     if (content is List) {
       final textParts = <String>[];
-      final toolUses = <LogOutputToolUse>[];
-      final toolResults = <LogOutputToolResult>[];
+      final toolUses = <FileLogToolUse>[];
+      final toolResults = <FileLogToolResult>[];
 
       for (final item in content) {
         if (item is! Map<String, dynamic>) continue;
@@ -271,7 +271,7 @@ class LogFileParser {
           case 'text':
             textParts.add(item['text'] as String? ?? '');
           case 'tool_use':
-            toolUses.add(LogOutputToolUse(
+            toolUses.add(FileLogToolUse(
               name: item['name'] as String? ?? '',
               id: item['id'] as String? ?? '',
               inputPreview: _truncate(
@@ -281,7 +281,7 @@ class LogFileParser {
             ));
           case 'tool_result':
             final c = item['content'];
-            toolResults.add(LogOutputToolResult(
+            toolResults.add(FileLogToolResult(
               toolUseId: item['tool_use_id'] as String? ?? '',
               contentPreview: _truncate(
                 c is String ? c : jsonEncode(c ?? ''),
@@ -293,7 +293,7 @@ class LogFileParser {
         }
       }
 
-      return LogOutputMessage(
+      return FileLogMessage(
         role: role,
         text: _truncate(textParts.join('\n'), 500),
         toolUses: toolUses.isNotEmpty ? toolUses : null,
@@ -301,7 +301,7 @@ class LogFileParser {
       );
     }
 
-    return LogOutputMessage(
+    return FileLogMessage(
       role: role,
       text: content != null ? _truncate(content.toString(), 500) : null,
     );
@@ -314,12 +314,12 @@ class LogFileParser {
 
   // ==================== SSE 响应解析 ====================
 
-  static LogOutputResponse _parseSseResponse(
+  static FileLogResponse _parseSseResponse(
     String raw,
     String endpointPath,
   ) {
     if (raw.isEmpty) {
-      return const LogOutputResponse(type: 'empty');
+      return const FileLogResponse(type: 'empty');
     }
 
     // 非 SSE：尝试直接解析为 JSON
@@ -328,13 +328,13 @@ class LogFileParser {
         final data = jsonDecode(raw) as Map<String, dynamic>;
         return _jsonToResponse('json', data);
       } catch (_) {
-        return const LogOutputResponse(type: 'raw');
+        return const FileLogResponse(type: 'raw');
       }
     }
 
     final events = _parseSseEvents(raw);
     if (events.isEmpty) {
-      return const LogOutputResponse(type: 'raw');
+      return const FileLogResponse(type: 'raw');
     }
 
     // 根据第一个事件判断格式
@@ -362,28 +362,28 @@ class LogFileParser {
     return _assembleAnthropicSse(events);
   }
 
-  /// 将非流式 JSON 响应转为 LogOutputResponse
-  static LogOutputResponse _jsonToResponse(
+  /// 将非流式 JSON 响应转为 FileLogResponse
+  static FileLogResponse _jsonToResponse(
     String type,
     Map<String, dynamic> data,
   ) {
     // 尝试提取 Anthropic 格式的字段
     final contentList = data['content'] as List<dynamic>?;
-    List<LogOutputContentBlock>? blocks;
+    List<FileLogContentBlock>? blocks;
     if (contentList != null) {
       blocks = contentList
           .whereType<Map<String, dynamic>>()
-          .map((c) => LogOutputContentBlock.fromJson(c))
+          .map((c) => FileLogContentBlock.fromJson(c))
           .toList();
     }
 
-    return LogOutputResponse(
+    return FileLogResponse(
       type: type,
       model: data['model'] as String?,
       stopReason:
           data['stop_reason'] as String? ?? data['finish_reason'] as String?,
       usage: data['usage'] is Map<String, dynamic>
-          ? LogOutputUsage.fromJson(data['usage'] as Map<String, dynamic>)
+          ? FileLogUsage.fromJson(data['usage'] as Map<String, dynamic>)
           : null,
       content: blocks,
       id: data['id'] as String?,
@@ -439,7 +439,7 @@ class LogFileParser {
 
   // ==================== Anthropic SSE 拼接 ====================
 
-  static LogOutputResponse _assembleAnthropicSse(
+  static FileLogResponse _assembleAnthropicSse(
     List<Map<String, dynamic>> events,
   ) {
     String? model;
@@ -519,7 +519,7 @@ class LogFileParser {
 
     // 整理 content blocks
     final sortedKeys = blocks.keys.toList()..sort();
-    final contentBlocks = <LogOutputContentBlock>[];
+    final contentBlocks = <FileLogContentBlock>[];
 
     for (final idx in sortedKeys) {
       final block = blocks[idx]!;
@@ -534,7 +534,7 @@ class LogFileParser {
         } catch (_) {
           // input 保持 null
         }
-        contentBlocks.add(LogOutputContentBlock(
+        contentBlocks.add(FileLogContentBlock(
           type: 'tool_use',
           id: block['id'] as String?,
           name: block['name'] as String?,
@@ -542,18 +542,18 @@ class LogFileParser {
         ));
       } else {
         // text 或 thinking
-        contentBlocks.add(LogOutputContentBlock(
+        contentBlocks.add(FileLogContentBlock(
           type: type,
           text: block[type == 'thinking' ? 'thinking' : 'text'] as String?,
         ));
       }
     }
 
-    return LogOutputResponse(
+    return FileLogResponse(
       type: 'anthropic_sse',
       model: model,
       stopReason: stopReason,
-      usage: usage != null ? LogOutputUsage.fromJson(usage) : null,
+      usage: usage != null ? FileLogUsage.fromJson(usage) : null,
       content: contentBlocks,
       id: id,
     );
@@ -561,7 +561,7 @@ class LogFileParser {
 
   // ==================== OpenAI SSE 拼接 ====================
 
-  static LogOutputResponse _assembleOpenaiSse(
+  static FileLogResponse _assembleOpenaiSse(
     List<Map<String, dynamic>> events,
   ) {
     String? model;
@@ -627,20 +627,20 @@ class LogFileParser {
       }
     }
 
-    // 将 tool_calls 转为 content blocks（复用 LogOutputContentBlock）
-    final contentBlocks = <LogOutputContentBlock>[];
+    // 将 tool_calls 转为 content blocks（复用 FileLogContentBlock）
+    final contentBlocks = <FileLogContentBlock>[];
 
     // 文本内容块
     final text = contentBuf.toString();
     if (text.isNotEmpty) {
-      contentBlocks.add(LogOutputContentBlock(type: 'text', text: text));
+      contentBlocks.add(FileLogContentBlock(type: 'text', text: text));
     }
 
     // 推理内容块
     final reasoning = reasoningBuf.toString();
     if (reasoning.isNotEmpty) {
       contentBlocks.add(
-        LogOutputContentBlock(type: 'thinking', text: reasoning),
+        FileLogContentBlock(type: 'thinking', text: reasoning),
       );
     }
 
@@ -656,7 +656,7 @@ class LogFileParser {
       } catch (_) {
         // 保持 null
       }
-      contentBlocks.add(LogOutputContentBlock(
+      contentBlocks.add(FileLogContentBlock(
         type: 'tool_use',
         id: tc['id'] as String?,
         name: fn['name'] as String?,
@@ -664,11 +664,11 @@ class LogFileParser {
       ));
     }
 
-    return LogOutputResponse(
+    return FileLogResponse(
       type: 'openai_sse',
       model: model,
       stopReason: finishReason,
-      usage: usage != null ? LogOutputUsage.fromJson(usage) : null,
+      usage: usage != null ? FileLogUsage.fromJson(usage) : null,
       content: contentBlocks.isNotEmpty ? contentBlocks : null,
     );
   }

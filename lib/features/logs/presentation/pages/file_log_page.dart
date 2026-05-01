@@ -1,12 +1,12 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:llm_proxy/features/logs/presentation/providers/log_output_providers.dart';
+import 'package:llm_proxy/features/logs/presentation/providers/file_log_providers.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/file_log_item.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_summary_bar.dart';
 
-class LogOutputPage extends ConsumerWidget {
-  const LogOutputPage({super.key});
+class FileLogPage extends ConsumerWidget {
+  const FileLogPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -52,7 +52,7 @@ class LogOutputPage extends ConsumerWidget {
     }
   }
 
-  Widget _buildBody(BuildContext context, LogOutputState state) {
+  Widget _buildBody(BuildContext context, FileLogState state) {
     if (state.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }

@@ -3,7 +3,7 @@ import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 
 /// 顶部统计摘要栏
 class LogSummaryBar extends StatelessWidget {
-  final List<LogOutputEntry> entries;
+  final List<FileLogEntry> entries;
   final String? filePath;
 
   const LogSummaryBar({super.key, required this.entries, this.filePath});

@@ -1,5 +1,5 @@
 /// 日志输出文件中的单条记录（对应 log_output.json 的每个元素）
-class LogOutputEntry {
+class FileLogEntry {
   final String timestamp;
   final String method;
   final String path;
@@ -7,11 +7,11 @@ class LogOutputEntry {
   final String? forwardTo;
   final int? durationMs;
   final int? statusCode;
-  final LogOutputRequest? request;
-  final LogOutputResponse? response;
+  final FileLogRequest? request;
+  final FileLogResponse? response;
   final int index;
 
-  const LogOutputEntry({
+  const FileLogEntry({
     required this.timestamp,
     required this.method,
     required this.path,
@@ -24,8 +24,8 @@ class LogOutputEntry {
     required this.index,
   });
 
-  factory LogOutputEntry.fromJson(Map<String, dynamic> json, int index) {
-    return LogOutputEntry(
+  factory FileLogEntry.fromJson(Map<String, dynamic> json, int index) {
+    return FileLogEntry(
       timestamp: json['timestamp'] as String? ?? '',
       method: json['method'] as String? ?? 'UNKNOWN',
       path: json['path'] as String? ?? '',
@@ -34,10 +34,10 @@ class LogOutputEntry {
       durationMs: json['duration_ms'] as int?,
       statusCode: json['status_code'] as int?,
       request: json['request'] != null
-          ? LogOutputRequest.fromJson(json['request'] as Map<String, dynamic>)
+          ? FileLogRequest.fromJson(json['request'] as Map<String, dynamic>)
           : null,
       response: json['response'] != null
-          ? LogOutputResponse.fromJson(json['response'] as Map<String, dynamic>)
+          ? FileLogResponse.fromJson(json['response'] as Map<String, dynamic>)
           : null,
       index: index,
     );
@@ -45,19 +45,19 @@ class LogOutputEntry {
 }
 
 /// 请求体
-class LogOutputRequest {
+class FileLogRequest {
   final String? model;
   final bool? stream;
-  final List<LogOutputMessage> messages;
+  final List<FileLogMessage> messages;
   /// system prompt 内容（截断后的文本预览）
   final String? systemPreview;
   /// system prompt 完整内容
   final String? systemFull;
   /// 工具定义列表（仅保留名称和描述摘要）
-  final List<LogOutputToolDef>? tools;
+  final List<FileLogToolDef>? tools;
   final Map<String, dynamic>? otherParams;
 
-  const LogOutputRequest({
+  const FileLogRequest({
     this.model,
     this.stream,
     required this.messages,
@@ -67,18 +67,18 @@ class LogOutputRequest {
     this.otherParams,
   });
 
-  factory LogOutputRequest.fromJson(Map<String, dynamic> json) {
+  factory FileLogRequest.fromJson(Map<String, dynamic> json) {
     final rawMessages = json['messages'] as List<dynamic>? ?? [];
-    return LogOutputRequest(
+    return FileLogRequest(
       model: json['model'] as String?,
       stream: json['stream'] as bool?,
       messages: rawMessages
-          .map((m) => LogOutputMessage.fromJson(m as Map<String, dynamic>))
+          .map((m) => FileLogMessage.fromJson(m as Map<String, dynamic>))
           .toList(),
       systemPreview: json['system_preview'] as String?,
       systemFull: json['system_full'] as String?,
       tools: (json['tools'] as List<dynamic>?)
-          ?.map((t) => LogOutputToolDef.fromJson(t as Map<String, dynamic>))
+          ?.map((t) => FileLogToolDef.fromJson(t as Map<String, dynamic>))
           .toList(),
       otherParams: json['other_params'] as Map<String, dynamic>?,
     );
@@ -86,49 +86,49 @@ class LogOutputRequest {
 }
 
 /// 对话消息
-class LogOutputMessage {
+class FileLogMessage {
   final String role;
   final String? text;
-  final List<LogOutputToolUse>? toolUses;
-  final List<LogOutputToolResult>? toolResults;
+  final List<FileLogToolUse>? toolUses;
+  final List<FileLogToolResult>? toolResults;
 
-  const LogOutputMessage({
+  const FileLogMessage({
     required this.role,
     this.text,
     this.toolUses,
     this.toolResults,
   });
 
-  factory LogOutputMessage.fromJson(Map<String, dynamic> json) {
+  factory FileLogMessage.fromJson(Map<String, dynamic> json) {
     final rawToolUses = json['tool_uses'] as List<dynamic>?;
     final rawToolResults = json['tool_results'] as List<dynamic>?;
-    return LogOutputMessage(
+    return FileLogMessage(
       role: json['role'] as String? ?? 'unknown',
       text: json['text'] as String?,
       toolUses: rawToolUses
-          ?.map((t) => LogOutputToolUse.fromJson(t as Map<String, dynamic>))
+          ?.map((t) => FileLogToolUse.fromJson(t as Map<String, dynamic>))
           .toList(),
       toolResults: rawToolResults
-          ?.map((t) => LogOutputToolResult.fromJson(t as Map<String, dynamic>))
+          ?.map((t) => FileLogToolResult.fromJson(t as Map<String, dynamic>))
           .toList(),
     );
   }
 }
 
 /// 工具调用
-class LogOutputToolUse {
+class FileLogToolUse {
   final String name;
   final String id;
   final String? inputPreview;
 
-  const LogOutputToolUse({
+  const FileLogToolUse({
     required this.name,
     required this.id,
     this.inputPreview,
   });
 
-  factory LogOutputToolUse.fromJson(Map<String, dynamic> json) {
-    return LogOutputToolUse(
+  factory FileLogToolUse.fromJson(Map<String, dynamic> json) {
+    return FileLogToolUse(
       name: json['name'] as String? ?? '',
       id: json['id'] as String? ?? '',
       inputPreview: json['input_preview'] as String?,
@@ -137,17 +137,17 @@ class LogOutputToolUse {
 }
 
 /// 工具调用结果
-class LogOutputToolResult {
+class FileLogToolResult {
   final String toolUseId;
   final String? contentPreview;
 
-  const LogOutputToolResult({
+  const FileLogToolResult({
     required this.toolUseId,
     this.contentPreview,
   });
 
-  factory LogOutputToolResult.fromJson(Map<String, dynamic> json) {
-    return LogOutputToolResult(
+  factory FileLogToolResult.fromJson(Map<String, dynamic> json) {
+    return FileLogToolResult(
       toolUseId: json['tool_use_id'] as String? ?? '',
       contentPreview: json['content_preview'] as String?,
     );
@@ -155,15 +155,15 @@ class LogOutputToolResult {
 }
 
 /// 响应体
-class LogOutputResponse {
+class FileLogResponse {
   final String? type;
   final String? model;
   final String? stopReason;
-  final LogOutputUsage? usage;
-  final List<LogOutputContentBlock>? content;
+  final FileLogUsage? usage;
+  final List<FileLogContentBlock>? content;
   final String? id;
 
-  const LogOutputResponse({
+  const FileLogResponse({
     this.type,
     this.model,
     this.stopReason,
@@ -172,18 +172,18 @@ class LogOutputResponse {
     this.id,
   });
 
-  factory LogOutputResponse.fromJson(Map<String, dynamic> json) {
+  factory FileLogResponse.fromJson(Map<String, dynamic> json) {
     final rawContent = json['content'] as List<dynamic>?;
-    return LogOutputResponse(
+    return FileLogResponse(
       type: json['type'] as String?,
       model: json['model'] as String?,
       stopReason: json['stop_reason'] as String?,
       usage: json['usage'] != null
-          ? LogOutputUsage.fromJson(json['usage'] as Map<String, dynamic>)
+          ? FileLogUsage.fromJson(json['usage'] as Map<String, dynamic>)
           : null,
       content: rawContent
           ?.map((c) =>
-              LogOutputContentBlock.fromJson(c as Map<String, dynamic>))
+              FileLogContentBlock.fromJson(c as Map<String, dynamic>))
           .toList(),
       id: json['id'] as String?,
     );
@@ -191,14 +191,14 @@ class LogOutputResponse {
 }
 
 /// Token 用量统计
-class LogOutputUsage {
+class FileLogUsage {
   final int? cacheCreationInputTokens;
   final int? cacheReadInputTokens;
   final int? inputTokens;
   final int? outputTokens;
   final String? serviceTier;
 
-  const LogOutputUsage({
+  const FileLogUsage({
     this.cacheCreationInputTokens,
     this.cacheReadInputTokens,
     this.inputTokens,
@@ -206,8 +206,8 @@ class LogOutputUsage {
     this.serviceTier,
   });
 
-  factory LogOutputUsage.fromJson(Map<String, dynamic> json) {
-    return LogOutputUsage(
+  factory FileLogUsage.fromJson(Map<String, dynamic> json) {
+    return FileLogUsage(
       cacheCreationInputTokens: json['cache_creation_input_tokens'] as int?,
       cacheReadInputTokens: json['cache_read_input_tokens'] as int?,
       inputTokens: json['input_tokens'] as int?,
@@ -223,14 +223,14 @@ class LogOutputUsage {
 }
 
 /// 响应内容块（text / tool_use）
-class LogOutputContentBlock {
+class FileLogContentBlock {
   final String type;
   final String? text;
   final String? id;
   final String? name;
   final Map<String, dynamic>? input;
 
-  const LogOutputContentBlock({
+  const FileLogContentBlock({
     required this.type,
     this.text,
     this.id,
@@ -238,8 +238,8 @@ class LogOutputContentBlock {
     this.input,
   });
 
-  factory LogOutputContentBlock.fromJson(Map<String, dynamic> json) {
-    return LogOutputContentBlock(
+  factory FileLogContentBlock.fromJson(Map<String, dynamic> json) {
+    return FileLogContentBlock(
       type: json['type'] as String? ?? '',
       text: json['text'] as String?,
       id: json['id'] as String?,
@@ -250,7 +250,7 @@ class LogOutputContentBlock {
 }
 
 /// 工具定义（请求体中的 tools 数组元素）
-class LogOutputToolDef {
+class FileLogToolDef {
   final String name;
   final String? descriptionPreview;
   /// 完整描述文本（用于弹窗展示）
@@ -258,15 +258,15 @@ class LogOutputToolDef {
   /// 工具参数 schema（用于弹窗展示）
   final Map<String, dynamic>? inputSchema;
 
-  const LogOutputToolDef({
+  const FileLogToolDef({
     required this.name,
     this.descriptionPreview,
     this.description,
     this.inputSchema,
   });
 
-  factory LogOutputToolDef.fromJson(Map<String, dynamic> json) {
-    return LogOutputToolDef(
+  factory FileLogToolDef.fromJson(Map<String, dynamic> json) {
+    return FileLogToolDef(
       name: json['name'] as String? ?? '',
       descriptionPreview: json['description_preview'] as String?,
       description: json['description'] as String?,

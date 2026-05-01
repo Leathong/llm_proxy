@@ -3,7 +3,7 @@ import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 
 /// 对话消息列表
 class MessageList extends StatelessWidget {
-  final List<LogOutputMessage> messages;
+  final List<FileLogMessage> messages;
 
   const MessageList({super.key, required this.messages});
 
@@ -17,7 +17,7 @@ class MessageList extends StatelessWidget {
 
 /// 单条对话消息
 class _MessageBubble extends StatelessWidget {
-  final LogOutputMessage message;
+  final FileLogMessage message;
 
   const _MessageBubble({required this.message});
 
@@ -147,7 +147,7 @@ class _MessageBubble extends StatelessWidget {
 
 /// 工具调用卡片
 class ToolUseCard extends StatelessWidget {
-  final LogOutputToolUse toolUse;
+  final FileLogToolUse toolUse;
 
   const ToolUseCard({super.key, required this.toolUse});
 
@@ -189,7 +189,7 @@ class ToolUseCard extends StatelessWidget {
 
 /// 工具结果卡片
 class ToolResultCard extends StatelessWidget {
-  final LogOutputToolResult result;
+  final FileLogToolResult result;
 
   const ToolResultCard({super.key, required this.result});
 

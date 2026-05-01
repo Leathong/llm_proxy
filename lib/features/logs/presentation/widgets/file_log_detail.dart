@@ -7,7 +7,7 @@ import 'package:llm_proxy/features/logs/presentation/widgets/response_content.da
 
 /// 日志详情面板
 class FileLogDetail extends StatelessWidget {
-  final LogOutputEntry entry;
+  final FileLogEntry entry;
 
   const FileLogDetail({super.key, required this.entry});
 
@@ -122,7 +122,7 @@ class FileLogDetail extends StatelessWidget {
     );
   }
 
-  void _showSystemDetail(BuildContext context, LogOutputRequest request) {
+  void _showSystemDetail(BuildContext context, FileLogRequest request) {
     final content = request.systemFull ?? request.systemPreview ?? '';
     showDialog(
       context: context,
@@ -172,7 +172,7 @@ class FileLogDetail extends StatelessWidget {
     );
   }
 
-  void _showToolDetail(BuildContext context, LogOutputToolDef tool) {
+  void _showToolDetail(BuildContext context, FileLogToolDef tool) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -282,7 +282,7 @@ class DetailSection extends StatelessWidget {
 
 /// Token 用量展示
 class UsageInfo extends StatelessWidget {
-  final LogOutputUsage usage;
+  final FileLogUsage usage;
 
   const UsageInfo({super.key, required this.usage});
 
