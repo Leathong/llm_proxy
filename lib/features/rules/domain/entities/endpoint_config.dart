@@ -1,5 +1,5 @@
 class EndpointConfig {
-  final String id;
+  final int id;
   final String url;
   final String apiKey;
   final bool active;
@@ -12,7 +12,7 @@ class EndpointConfig {
   });
 
   EndpointConfig copyWith({
-    String? id,
+    int? id,
     String? url,
     String? apiKey,
     bool? active,

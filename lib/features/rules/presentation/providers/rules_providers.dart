@@ -1,52 +1,58 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:llm_proxy/core/database/app_database.dart' hide Rule, Endpoint;
+import 'package:llm_proxy/features/rules/domain/entities/endpoint_config.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
 import 'package:llm_proxy/features/rules/domain/repositories/rule_repository.dart';
-import 'package:llm_proxy/features/rules/data/datasources/rule_local_datasource.dart';
-import 'package:llm_proxy/features/rules/data/repositories/rule_repository_impl.dart';
+import 'package:llm_proxy/features/rules/data/repositories/drift_rule_repository.dart';
 import 'package:llm_proxy/features/settings/presentation/providers/settings_providers.dart';
 
-final ruleLocalDataSourceProvider = Provider<RuleLocalDataSource>((ref) {
-  final prefs = ref.read(sharedPreferencesProvider);
-  return RuleLocalDataSource(prefs);
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  throw UnimplementedError('必须先在 main 中 override appDatabaseProvider');
 });
 
 final ruleRepositoryProvider = Provider<RuleRepository>((ref) {
-  final dataSource = ref.read(ruleLocalDataSourceProvider);
-  return RuleRepositoryImpl(dataSource);
+  final db = ref.read(appDatabaseProvider);
+  final prefs = ref.read(sharedPreferencesProvider);
+  return DriftRuleRepository(db, prefs);
 });
 
-class RulesNotifier extends Notifier<List<Rule>> {
+class RulesNotifier extends AsyncNotifier<List<Rule>> {
   @override
-  List<Rule> build() {
+  Future<List<Rule>> build() async {
     final repo = ref.watch(ruleRepositoryProvider);
     return repo.getRules();
   }
 
-  Future<void> add(Rule rule) async {
+  Future<void> add(Rule rule, List<EndpointConfig> endpoints) async {
     final repo = ref.read(ruleRepositoryProvider);
-    await repo.addRule(rule);
+    await repo.addRule(rule, endpoints);
     ref.invalidateSelf();
   }
 
-  Future<void> update(Rule rule) async {
+  Future<void> updateRule(Rule rule, List<EndpointConfig> endpoints) async {
     final repo = ref.read(ruleRepositoryProvider);
-    await repo.updateRule(rule);
+    await repo.updateRule(rule, endpoints);
     ref.invalidateSelf();
   }
 
-  Future<void> delete(String id) async {
+  Future<void> delete(int id) async {
     final repo = ref.read(ruleRepositoryProvider);
     await repo.deleteRule(id);
     ref.invalidateSelf();
   }
 
-  Future<void> toggle(String id, bool active) async {
+  Future<void> toggle(int id, bool active) async {
     final repo = ref.read(ruleRepositoryProvider);
     await repo.toggleRule(id, active);
     ref.invalidateSelf();
   }
 }
 
-final rulesProvider = NotifierProvider<RulesNotifier, List<Rule>>(
+final rulesProvider = AsyncNotifierProvider<RulesNotifier, List<Rule>>(
   RulesNotifier.new,
 );
+
+final allEndpointsProvider = FutureProvider<List<EndpointConfig>>((ref) {
+  final repo = ref.watch(ruleRepositoryProvider);
+  return repo.getAllEndpoints();
+});

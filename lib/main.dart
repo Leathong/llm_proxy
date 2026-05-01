@@ -6,6 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:llm_proxy/app/app.dart';
+import 'package:llm_proxy/core/database/app_database.dart';
+import 'package:llm_proxy/features/rules/data/repositories/drift_rule_repository.dart';
+import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.dart';
 import 'package:llm_proxy/features/settings/presentation/providers/settings_providers.dart';
 
 void main() async {
@@ -13,6 +16,13 @@ void main() async {
 
   // 初始化 SharedPreferences
   final prefs = await SharedPreferences.getInstance();
+
+  // 初始化 Drift 数据库
+  final database = AppDatabase();
+
+  // 从 SharedPreferences 迁移旧数据到 Drift（仅首次执行）
+  final migrationRepo = DriftRuleRepository(database, prefs);
+  await migrationRepo.migrateFromSharedPreferences();
 
   // 初始化窗口管理器
   await windowManager.ensureInitialized();
@@ -42,6 +52,7 @@ void main() async {
     ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
+        appDatabaseProvider.overrideWithValue(database),
       ],
       child: const _TrayAwareApp(),
     ),

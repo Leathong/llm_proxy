@@ -1,9 +1,8 @@
 import 'package:llm_proxy/features/rules/domain/entities/endpoint_config.dart';
 
 class Rule {
-  final String id;
+  final int id;
   final String name;
-  // 多 endpoint 配置，支持负载均衡
   final List<EndpointConfig> endpoints;
   final String customModelId;
   final String targetModelId;
@@ -22,12 +21,11 @@ class Rule {
     this.reasoningEffort = '',
   });
 
-  /// 获取所有启用的 endpoint
   List<EndpointConfig> get activeEndpoints =>
       endpoints.where((e) => e.active).toList();
 
   Rule copyWith({
-    String? id,
+    int? id,
     String? name,
     List<EndpointConfig>? endpoints,
     String? customModelId,

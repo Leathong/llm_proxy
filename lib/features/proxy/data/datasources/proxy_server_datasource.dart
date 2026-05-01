@@ -16,9 +16,9 @@ class ProxyServerDataSource {
   int _logIdCounter = 0;
 
   // Round-Robin 计数器，key 为 rule.id
-  final Map<String, int> _rrCounters = {};
+  final Map<int, int> _rrCounters = {};
 
-  final List<Rule> Function() getRules;
+  final Future<List<Rule>> Function() getRules;
   final void Function(String message)? onLog;
   final void Function(LogEntry logEntry)? onLogEntry;
   final void Function(LogEntry logEntry)? onLogEntryUpdate;
@@ -141,7 +141,7 @@ class ProxyServerDataSource {
 
   Future<void> _handleModelsRequest(HttpRequest request) async {
     final startTime = DateTime.now();
-    final rules = getRules().where((r) => r.active).toList();
+    final rules = (await getRules()).where((r) => r.active).toList();
     final models = rules.map((r) => {
       'id': r.customModelId,
       'object': 'model',
@@ -272,7 +272,7 @@ class ProxyServerDataSource {
         status: LogStatus.pending,
       );
 
-      final allRules = getRules();
+      final allRules = await getRules();
       Rule? rule;
       for (final r in allRules) {
         if (r.active && r.customModelId == requestedModelId) {

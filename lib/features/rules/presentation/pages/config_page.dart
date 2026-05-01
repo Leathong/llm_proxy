@@ -9,40 +9,47 @@ class ConfigPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final rules = ref.watch(rulesProvider);
+    final rulesAsync = ref.watch(rulesProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('规则配置')),
-      body: rules.isEmpty
-          ? const Center(
-              child: Text('暂无代理规则，请点击右下角添加'),
-            )
-          : ListView.builder(
-              itemCount: rules.length,
-              itemBuilder: (context, index) {
-                final rule = rules[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: ListTile(
-                    title: Text(rule.name),
-                    subtitle: Text(
-                      '${rule.customModelId} -> ${rule.targetModelId}\n'
-                      'Endpoints: ${rule.activeEndpoints.length}/${rule.endpoints.length} 活跃',
-                    ),
-                    isThreeLine: true,
-                    trailing: Transform.scale(
-                      scale: 0.75,
-                      child: Switch(
-                        value: rule.active,
-                        onChanged: (val) => ref.read(rulesProvider.notifier).toggle(rule.id, val),
+      body: rulesAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('加载失败: $e')),
+        data: (rules) => rules.isEmpty
+            ? const Center(
+                child: Text('暂无代理规则，请点击右下角添加'),
+              )
+            : ListView.builder(
+                itemCount: rules.length,
+                itemBuilder: (context, index) {
+                  final rule = rules[index];
+                  return Card(
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: ListTile(
+                      title: Text(rule.name),
+                      subtitle: Text(
+                        '${rule.customModelId} -> ${rule.targetModelId}\n'
+                        'Endpoints: ${rule.activeEndpoints.length}/${rule.endpoints.length} 活跃',
                       ),
+                      isThreeLine: true,
+                      trailing: Transform.scale(
+                        scale: 0.75,
+                        child: Switch(
+                          value: rule.active,
+                          onChanged: (val) =>
+                              ref.read(rulesProvider.notifier).toggle(rule.id, val),
+                        ),
+                      ),
+                      onTap: () => _showRuleDialog(context, ref, rule: rule),
+                      onLongPress: () =>
+                          _showDeleteDialog(context, ref, rule),
                     ),
-                    onTap: () => _showRuleDialog(context, ref, rule: rule),
-                    onLongPress: () => _showDeleteDialog(context, ref, rule),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showRuleDialog(context, ref),
         child: const Icon(Icons.add),
@@ -64,7 +71,8 @@ class ConfigPage extends ConsumerWidget {
         title: const Text('删除规则'),
         content: const Text('确定要删除这条规则吗？'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
           TextButton(
             onPressed: () {
               ref.read(rulesProvider.notifier).delete(rule.id);
