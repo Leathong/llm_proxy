@@ -5,11 +5,19 @@ import 'package:llm_proxy/features/logs/presentation/providers/file_log_provider
 import 'package:llm_proxy/features/logs/presentation/widgets/file_log_item.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_summary_bar.dart';
 
-class FileLogPage extends ConsumerWidget {
+class FileLogPage extends ConsumerStatefulWidget {
   const FileLogPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FileLogPage> createState() => _FileLogPageState();
+}
+
+class _FileLogPageState extends ConsumerState<FileLogPage> {
+  // 是否倒序显示（最新的在前）
+  bool _reversed = false;
+
+  @override
+  Widget build(BuildContext context) {
     final logState = ref.watch(logOutputProvider);
 
     return Scaffold(
@@ -28,6 +36,15 @@ class FileLogPage extends ConsumerWidget {
               tooltip: '重新加载',
               onPressed: () =>
                   ref.read(logOutputProvider.notifier).loadFile(logState.filePath!),
+            ),
+          // 排序切换按钮
+          if (logState.entries.isNotEmpty)
+            IconButton(
+              icon: Icon(
+                _reversed ? Icons.arrow_upward : Icons.arrow_downward,
+              ),
+              tooltip: _reversed ? '切换为正序' : '切换为倒序',
+              onPressed: () => setState(() => _reversed = !_reversed),
             ),
           if (logState.entries.isNotEmpty)
             IconButton(
@@ -84,16 +101,18 @@ class FileLogPage extends ConsumerWidget {
       );
     }
 
-    // 统计摘要 + 日志列表
+    final displayEntries =
+        _reversed ? state.entries.reversed.toList() : state.entries;
+
     return Column(
       children: [
         LogSummaryBar(entries: state.entries, filePath: state.filePath),
         const Divider(height: 1),
         Expanded(
           child: ListView.builder(
-            itemCount: state.entries.length,
+            itemCount: displayEntries.length,
             itemBuilder: (context, index) =>
-                FileLogItem(entry: state.entries[index]),
+                FileLogItem(entry: displayEntries[index]),
           ),
         ),
       ],
