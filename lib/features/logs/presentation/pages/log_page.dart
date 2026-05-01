@@ -10,7 +10,10 @@ class LogPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final logs = ref.watch(logsProvider);
+    // watch 版本号以感知数据变化，实际数据从 repo 按索引直接读取
+    ref.watch(logsProvider);
+    final repo = ref.read(logRepositoryProvider);
+    final logCount = repo.logCount;
 
     return Scaffold(
       appBar: AppBar(
@@ -23,7 +26,7 @@ class LogPage extends ConsumerWidget {
           ),
         ],
       ),
-      body: logs.isEmpty
+      body: logCount == 0
           ? const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -35,8 +38,8 @@ class LogPage extends ConsumerWidget {
               ),
             )
           : ListView.builder(
-              itemCount: logs.length,
-              itemBuilder: (context, index) => _LogItem(log: logs[index]),
+              itemCount: logCount,
+              itemBuilder: (context, index) => _LogItem(log: repo.getLog(index)),
             ),
     );
   }

@@ -25,7 +25,10 @@ class ConfigPage extends ConsumerWidget {
                   margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: ListTile(
                     title: Text(rule.name),
-                    subtitle: Text('${rule.customModelId} -> ${rule.targetModelId}\n${rule.endpoint}'),
+                    subtitle: Text(
+                      '${rule.customModelId} -> ${rule.targetModelId}\n'
+                      'Endpoints: ${rule.activeEndpoints.length}/${rule.endpoints.length} 活跃',
+                    ),
                     isThreeLine: true,
                     trailing: Transform.scale(
                       scale: 0.75,

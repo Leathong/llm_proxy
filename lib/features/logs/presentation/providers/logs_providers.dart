@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
 import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
 import 'package:llm_proxy/features/logs/data/repositories/log_repository_impl.dart';
 
@@ -7,21 +6,21 @@ final logRepositoryProvider = Provider<LogRepository>((ref) {
   return LogRepositoryImpl();
 });
 
-class LogsNotifier extends Notifier<List<LogEntry>> {
+/// state 为递增版本号，仅用于通知 UI 刷新；
+/// 实际数据由 [logRepositoryProvider] 持有，UI 按索引直接读取。
+class LogsNotifier extends Notifier<int> {
   @override
-  List<LogEntry> build() {
-    final repo = ref.watch(logRepositoryProvider);
-    final count = repo.logCount;
-    return List.generate(count, (i) => repo.getLog(i));
-  }
+  int build() => 0;
+
+  void refresh() => state++;
 
   void clear() {
     ref.read(logRepositoryProvider).clearLogs();
-    ref.invalidateSelf();
+    state++;
   }
 }
 
-final logsProvider = NotifierProvider<LogsNotifier, List<LogEntry>>(
+final logsProvider = NotifierProvider<LogsNotifier, int>(
   LogsNotifier.new,
 );
 

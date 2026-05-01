@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:llm_proxy/features/logs/data/datasources/log_file_writer.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
+import 'package:llm_proxy/features/rules/domain/entities/endpoint_config.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
 
 class ProxyServerDataSource {
@@ -13,6 +14,9 @@ class ProxyServerDataSource {
   int _port = 8080;
 
   int _logIdCounter = 0;
+
+  // Round-Robin 计数器，key 为 rule.id
+  final Map<String, int> _rrCounters = {};
 
   final List<Rule> Function() getRules;
   final void Function(String message)? onLog;
@@ -31,6 +35,16 @@ class ProxyServerDataSource {
 
   void setLogFilePath(String path) {
     _logWriter.setLogFilePath(path);
+  }
+
+  /// Round-Robin 选择一个活跃的 endpoint
+  EndpointConfig _pickEndpoint(Rule rule) {
+    final active = rule.activeEndpoints;
+    if (active.length == 1) return active.first;
+    final counter = _rrCounters[rule.id] ?? 0;
+    final picked = active[counter % active.length];
+    _rrCounters[rule.id] = counter + 1;
+    return picked;
   }
 
   Future<void> start({int port = 8080, String? certPath, String? keyPath}) async {
@@ -74,6 +88,7 @@ class ProxyServerDataSource {
     if (!isRunning) return;
     await _server!.close(force: true);
     _server = null;
+    _rrCounters.clear();
     _log('代理服务器已停止');
   }
 
@@ -99,8 +114,8 @@ class ProxyServerDataSource {
 
       if (path.endsWith('/v1/models')) {
         await _handleModelsRequest(request);
-      } else if (path.endsWith('/v1/chat/completions')) {
-        await _handleChatCompletionsRequest(request);
+      } else if (path == '/v1/chat/completions' || path == '/v1/messages') {
+        await _handleChatCompletionsRequest(request, endpoint: path);
       } else {
         request.response.statusCode = HttpStatus.notFound;
         request.response.write('Not Found');
@@ -162,7 +177,7 @@ class ProxyServerDataSource {
     );
   }
 
-  Future<void> _handleChatCompletionsRequest(HttpRequest request) async {
+  Future<void> _handleChatCompletionsRequest(HttpRequest request, {required String endpoint}) async {
     final startTime = DateTime.now();
     final logId = _nextLogId();
     String? responseBodyStr;
@@ -292,7 +307,36 @@ class ProxyServerDataSource {
         return;
       }
 
-      _log('匹配到规则: ${rule.name}, 转发至 ${rule.endpoint}');
+      // 负载均衡：从活跃的 endpoints 中选择
+      final activeEps = rule.activeEndpoints;
+      if (activeEps.isEmpty) {
+        final errorResp = jsonEncode({
+          'error': {
+            'message': 'No active endpoint for rule: ${rule.name}',
+            'type': 'invalid_request_error',
+          }
+        });
+        request.response.statusCode = HttpStatus.serviceUnavailable;
+        request.response.write(errorResp);
+        await request.response.close();
+        _log('规则 ${rule.name} 没有可用的 endpoint');
+        _updateLog(
+          id: logId, time: startTime, method: request.method,
+          path: request.uri.path, model: requestedModelId,
+          statusCode: HttpStatus.serviceUnavailable, status: LogStatus.error,
+          error: 'No active endpoint',
+        );
+        _logWriter.writeLog(
+          time: startTime, method: request.method, path: request.uri.path,
+          requestBody: bodyString, statusCode: HttpStatus.serviceUnavailable,
+          responseBody: errorResp, error: 'No active endpoint',
+          model: requestedModelId,
+        );
+        return;
+      }
+
+      final selectedEndpoint = _pickEndpoint(rule);
+      _log('匹配到规则: ${rule.name}, 负载均衡选中 endpoint: ${selectedEndpoint.url}');
 
       bodyJson['model'] = rule.targetModelId;
 
@@ -327,13 +371,14 @@ class ProxyServerDataSource {
       final modifiedBodyStr = jsonEncode(bodyJson);
       final newBodyBytes = utf8.encode(modifiedBodyStr);
 
-      var targetUrl = rule.endpoint;
-      if (!targetUrl.endsWith('/v1/chat/completions')) {
+      // 使用负载均衡选中的 endpoint URL
+      var targetUrl = selectedEndpoint.url;
+      if (!targetUrl.endsWith(endpoint)) {
         if (targetUrl.endsWith('/')) {
-          targetUrl += 'v1/chat/completions';
-        } else {
-          targetUrl += '/v1/chat/completions';
+          targetUrl = targetUrl.substring(0, targetUrl.length - 1);
         }
+
+        targetUrl += endpoint;
       }
 
       _updateLog(
@@ -359,8 +404,9 @@ class ProxyServerDataSource {
           }
         });
 
-        if (rule.apiKey.isNotEmpty) {
-          targetRequest.headers.add('Authorization', 'Bearer ${rule.apiKey}');
+        // 使用选中 endpoint 的 apiKey，若为空则透传原始 Authorization
+        if (selectedEndpoint.apiKey.isNotEmpty) {
+          targetRequest.headers.add('Authorization', 'Bearer ${selectedEndpoint.apiKey}');
         } else {
           final authHeader = request.headers.value('authorization');
           if (authHeader != null) {

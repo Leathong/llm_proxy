@@ -9,11 +9,22 @@ import 'package:llm_proxy/features/settings/presentation/providers/settings_prov
 /// ProxyServer 数据源单例
 final proxyServerDataSourceProvider = Provider<ProxyServerDataSource>((ref) {
   final logRepo = ref.read(logRepositoryProvider);
+  final logsNotifier = ref.read(logsProvider.notifier);
   return ProxyServerDataSource(
     getRules: () => ref.read(ruleRepositoryProvider).getRules(),
     onLog: (msg) => debugPrint('[ProxyServer] $msg'),
-    onLogEntry: (log) => logRepo.addLog(log),
-    onLogEntryUpdate: (log) => logRepo.updateLog(log, silent: log.status == LogStatus.pending),
+    onLogEntry: (log) {
+      logRepo.addLog(log);
+      logsNotifier.refresh();
+    },
+    onLogEntryUpdate: (log) {
+      final silent = log.status == LogStatus.pending;
+      logRepo.updateLog(log, silent: silent);
+      // silent 模式（pending 中间态）不刷新 UI，减少不必要的重绘
+      if (!silent) {
+        logsNotifier.refresh();
+      }
+    },
   );
 });
 

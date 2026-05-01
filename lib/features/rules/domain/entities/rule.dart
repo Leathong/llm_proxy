@@ -1,8 +1,10 @@
+import 'package:llm_proxy/features/rules/domain/entities/endpoint_config.dart';
+
 class Rule {
   final String id;
   final String name;
-  final String endpoint;
-  final String apiKey;
+  // 多 endpoint 配置，支持负载均衡
+  final List<EndpointConfig> endpoints;
   final String customModelId;
   final String targetModelId;
   final bool active;
@@ -12,8 +14,7 @@ class Rule {
   const Rule({
     required this.id,
     required this.name,
-    required this.endpoint,
-    required this.apiKey,
+    this.endpoints = const [],
     required this.customModelId,
     required this.targetModelId,
     this.active = true,
@@ -21,11 +22,14 @@ class Rule {
     this.reasoningEffort = '',
   });
 
+  /// 获取所有启用的 endpoint
+  List<EndpointConfig> get activeEndpoints =>
+      endpoints.where((e) => e.active).toList();
+
   Rule copyWith({
     String? id,
     String? name,
-    String? endpoint,
-    String? apiKey,
+    List<EndpointConfig>? endpoints,
     String? customModelId,
     String? targetModelId,
     bool? active,
@@ -35,8 +39,7 @@ class Rule {
     return Rule(
       id: id ?? this.id,
       name: name ?? this.name,
-      endpoint: endpoint ?? this.endpoint,
-      apiKey: apiKey ?? this.apiKey,
+      endpoints: endpoints ?? this.endpoints,
       customModelId: customModelId ?? this.customModelId,
       targetModelId: targetModelId ?? this.targetModelId,
       active: active ?? this.active,
