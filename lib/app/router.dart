@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:llm_proxy/features/proxy/presentation/pages/dashboard_page.dart';
 import 'package:llm_proxy/features/rules/presentation/pages/config_page.dart';
 import 'package:llm_proxy/features/logs/presentation/pages/log_page.dart';
+import 'package:llm_proxy/features/logs/presentation/pages/log_output_page.dart';
 import 'package:llm_proxy/features/settings/presentation/pages/settings_page.dart';
 
 /// 无过渡动画的页面构建器
@@ -46,6 +47,13 @@ final GoRouter appRouter = GoRouter(
           ),
         ),
         GoRoute(
+          path: '/log-output',
+          name: 'log-output',
+          pageBuilder: (context, state) => _noTransitionPageBuilder(
+            context, state, const LogOutputPage(),
+          ),
+        ),
+        GoRoute(
           path: '/settings',
           name: 'settings',
           pageBuilder: (context, state) => _noTransitionPageBuilder(
@@ -73,8 +81,10 @@ class _NavigationShell extends StatelessWidget {
         selectedIndex = 1;
       case '/logs':
         selectedIndex = 2;
-      case '/settings':
+      case '/log-output':
         selectedIndex = 3;
+      case '/settings':
+        selectedIndex = 4;
       default:
         selectedIndex = 0;
     }
@@ -89,7 +99,8 @@ class _NavigationShell extends StatelessWidget {
                 case 0: context.go('/dashboard');
                 case 1: context.go('/rules');
                 case 2: context.go('/logs');
-                case 3: context.go('/settings');
+                case 3: context.go('/log-output');
+                case 4: context.go('/settings');
               }
             },
             labelType: NavigationRailLabelType.all,
@@ -108,6 +119,11 @@ class _NavigationShell extends StatelessWidget {
                 icon: Icon(Icons.list_alt_outlined),
                 selectedIcon: Icon(Icons.list_alt),
                 label: Text('日志查看'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.analytics_outlined),
+                selectedIcon: Icon(Icons.analytics),
+                label: Text('日志分析'),
               ),
               NavigationRailDestination(
                 icon: Icon(Icons.settings_outlined),

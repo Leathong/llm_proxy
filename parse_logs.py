@@ -1,351 +1,570 @@
 #!/usr/bin/env python3
 """
-解析 llm_proxy_requests.log，提取流式 SSE 响应并拼接成完整响应内容。
+解析 llm_proxy 请求日志，生成结构化 JSON 数据。
+支持 Anthropic 和 OpenAI 的 SSE 流式响应拼接。
 
-日志格式：
-    -------------------- 2026-04-30 17:50:32 --------------------
-    [REQUEST] POST /v1/chat/completions
-    [Model] deepseek-v4-flash
-    [Forward To] https://api.deepseek.com/v1/chat/completions
-    [Duration] 2247ms
-    [Status] 200
-    [Request Body]
-    { ... JSON ... }
-    [Response Body]
-    data: {"id":"...","object":"chat.completion.chunk",...,"delta":{"content":"你好"}...}
-    data: {"id":"...","object":"chat.completion.chunk",...,"delta":{"content":"！"}...}
-    ...
-    data: [DONE]
-
-用法：
-    python3 parse_logs.py [日志文件路径]             # 解析日志并输出到终端
-    python3 parse_logs.py -o output.txt             # 输出到文件
-    python3 parse_logs.py --no-body                 # 只显示请求摘要
-    python3 parse_logs.py -n 2                      # 只显示最近 N 个请求
+用法: python parse_logs.py <日志文件路径> [-o 输出文件路径]
 """
 
 import re
-import sys
 import json
+import sys
 import argparse
+from datetime import datetime
 
 
-SEPARATOR_RE = re.compile(r'^-{20} (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) -{20}$')
-REQUEST_RE = re.compile(r'^\[REQUEST\] (.+)$')
-MODEL_RE = re.compile(r'^\[Model\] (.+)$')
-FORWARD_RE = re.compile(r'^\[Forward To\] (.+)$')
-DURATION_RE = re.compile(r'^\[Duration\] (.+)$')
-STATUS_RE = re.compile(r'^\[Status\] (\d+)$')
-REQUEST_BODY_RE = re.compile(r'^\[Request Body\]$')
-RESPONSE_BODY_RE = re.compile(r'^\[Response Body\]$')
-ERROR_RE = re.compile(r'^\[Error\] (.+)$')
-STREAM_DATA_RE = re.compile(r'^data: (.+)$')
-STREAM_DONE_RE = re.compile(r'^data: \[DONE\]$')
+# ==================== 日志分割 ====================
+
+# 匹配日志条目分隔线: -------------------- 2026-05-01 10:14:53 --------------------
+SEPARATOR_RE = re.compile(r'^-{20}\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+-{20}$')
+
+# 匹配元数据行
+META_PATTERNS = {
+    'request':    re.compile(r'^\[REQUEST\]\s+(\S+)\s+(.+)$'),
+    'model':      re.compile(r'^\[Model\]\s+(.+)$'),
+    'forward_to': re.compile(r'^\[Forward To\]\s+(.+)$'),
+    'duration':   re.compile(r'^\[Duration\]\s+(\d+)ms$'),
+    'status':     re.compile(r'^\[Status\]\s+(\d+)$'),
+}
 
 
-def reconstruct_stream_response(chunks):
+def split_log_entries(filepath: str) -> list[dict]:
+    """将日志文件按分隔线切分为独立条目"""
+    entries = []
+    current_lines = []
+    current_time = None
+
+    with open(filepath, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.rstrip('\n')
+            m = SEPARATOR_RE.match(line)
+            if m:
+                # 遇到新分隔线，保存上一条
+                if current_time and current_lines:
+                    entries.append({'timestamp': current_time, 'lines': current_lines})
+                current_time = m.group(1)
+                current_lines = []
+            else:
+                current_lines.append(line)
+
+    # 最后一条
+    if current_time and current_lines:
+        entries.append({'timestamp': current_time, 'lines': current_lines})
+
+    return entries
+
+
+# ==================== 元数据解析 ====================
+
+def parse_metadata(lines: list[str]) -> tuple[dict, int]:
     """
-    将一系列 SSE chunk JSON 拼接成完整响应文本。
-    对 chat.completion.chunk 类型，提取所有 delta.content 拼接。
+    解析元数据行，返回 (metadata_dict, body_start_index)。
+    body_start_index 指向 [Request Body] 之后的第一行。
     """
-    contents = []
-    usage_data = {}
-    for chunk_str in chunks:
-        try:
-            data = json.loads(chunk_str)
-        except json.JSONDecodeError:
-            continue
+    meta = {}
+    idx = 0
+    while idx < len(lines):
+        line = lines[idx]
 
-        obj_type = data.get('object', '')
-        if obj_type == 'chat.completion.chunk':
-            choices = data.get('choices', [])
-            for choice in choices:
-                delta = choice.get('delta', {})
-                content = delta.get('content', '')
-                if content:
-                    contents.append(content)
-            if data.get('usage'):
-                usage_data = data['usage']
-        else:
-            # 非标准 chunk 类型，直接返回原始 JSON 组
-            return '\n'.join(chunks)
+        # 遇到 [Request Body] 标记，后续为请求体
+        if line.strip() == '[Request Body]':
+            idx += 1
+            break
 
-    full_text = ''.join(contents)
-    if not full_text and not usage_data:
-        return json.dumps(chunks, ensure_ascii=False, indent=2)
+        for key, pattern in META_PATTERNS.items():
+            m = pattern.match(line)
+            if m:
+                if key == 'request':
+                    meta['method'] = m.group(1)
+                    meta['path'] = m.group(2)
+                elif key == 'duration':
+                    meta['duration_ms'] = int(m.group(1))
+                elif key == 'status':
+                    meta['status_code'] = int(m.group(1))
+                else:
+                    meta[key] = m.group(1)
+                break
+        idx += 1
 
-    result = full_text
-    if usage_data:
-        usage_str = json.dumps(usage_data, ensure_ascii=False)
-        result += f'\n\n--- Usage: {usage_str} ---'
+    return meta, idx
+
+
+# ==================== 请求体 / 响应体分割 ====================
+
+def split_request_response(lines: list[str], body_start: int) -> tuple[str, str]:
+    """
+    从 body_start 开始，找到 [Response Body] 分界，
+    返回 (request_body_str, response_body_str)。
+    """
+    response_marker = None
+    for i in range(body_start, len(lines)):
+        if lines[i].strip() == '[Response Body]':
+            response_marker = i
+            break
+
+    if response_marker is not None:
+        req_body = '\n'.join(lines[body_start:response_marker])
+        resp_body = '\n'.join(lines[response_marker + 1:])
+    else:
+        req_body = '\n'.join(lines[body_start:])
+        resp_body = ''
+
+    return req_body.strip(), resp_body.strip()
+
+
+# ==================== 请求体解析 ====================
+
+def parse_request_body(raw: str) -> dict | None:
+    """解析请求体 JSON，提取关键字段"""
+    if not raw:
+        return None
+    try:
+        body = json.loads(raw)
+    except json.JSONDecodeError:
+        return {'raw': raw}
+
+    result = {}
+    # 提取模型
+    if 'model' in body:
+        result['model'] = body['model']
+
+    # 提取 stream 标志
+    if 'stream' in body:
+        result['stream'] = body['stream']
+
+    # 提取消息（简化：只保留 role 和 text 内容摘要）
+    if 'messages' in body:
+        result['messages'] = _simplify_messages(body['messages'])
+
+    # 保留其他顶层参数（排除 messages 和已提取的）
+    extras = {k: v for k, v in body.items() if k not in ('model', 'stream', 'messages')}
+    if extras:
+        result['other_params'] = extras
+
     return result
 
 
-def parse_log(filepath):
+def _simplify_messages(messages: list) -> list[dict]:
+    """简化消息列表，提取 role 和文本内容摘要"""
+    simplified = []
+    for msg in messages:
+        role = msg.get('role', 'unknown')
+        content = msg.get('content', '')
+
+        # content 可能是字符串或数组
+        if isinstance(content, str):
+            text = content
+        elif isinstance(content, list):
+            # 拼接所有 text 类型的内容
+            parts = []
+            tool_uses = []
+            tool_results = []
+            for item in content:
+                if isinstance(item, dict):
+                    t = item.get('type', '')
+                    if t == 'text':
+                        parts.append(item.get('text', ''))
+                    elif t == 'tool_use':
+                        tool_uses.append({
+                            'name': item.get('name', ''),
+                            'id': item.get('id', ''),
+                            'input_preview': _truncate(json.dumps(item.get('input', {}), ensure_ascii=False), 200),
+                        })
+                    elif t == 'tool_result':
+                        tool_results.append({
+                            'tool_use_id': item.get('tool_use_id', ''),
+                            'content_preview': _truncate(
+                                item.get('content', '') if isinstance(item.get('content'), str)
+                                else json.dumps(item.get('content', ''), ensure_ascii=False),
+                                200
+                            ),
+                        })
+                    elif t == 'image':
+                        parts.append('[image]')
+            text = '\n'.join(parts)
+            entry = {'role': role, 'text': _truncate(text, 500)}
+            if tool_uses:
+                entry['tool_uses'] = tool_uses
+            if tool_results:
+                entry['tool_results'] = tool_results
+            simplified.append(entry)
+            continue
+        else:
+            text = str(content)
+
+        simplified.append({'role': role, 'text': _truncate(text, 500)})
+
+    return simplified
+
+
+def _truncate(s: str, max_len: int) -> str:
+    if len(s) <= max_len:
+        return s
+    return s[:max_len] + f'... ({len(s)} chars total)'
+
+
+# ==================== SSE 响应解析 ====================
+
+def parse_sse_response(raw: str, endpoint_path: str = '') -> dict:
     """
-    解析日志文件，返回请求记录列表。
-    状态机: INIT -> HEADER -> REQUEST_BODY -> RESPONSE_BODY
+    解析 SSE 响应，自动检测 Anthropic 或 OpenAI 格式。
+    返回结构化的响应数据。
     """
-    with open(filepath, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
+    if not raw:
+        return {'type': 'empty'}
 
-    records = []
-    current = None
-    section = 'HEADER'  # HEADER | REQUEST_BODY | RESPONSE_BODY
-    stream_chunks = []
+    # 非 SSE：尝试直接解析为 JSON（非流式响应）
+    if not raw.startswith('event:') and not raw.startswith('data:'):
+        try:
+            return {'type': 'json', 'data': json.loads(raw)}
+        except json.JSONDecodeError:
+            return {'type': 'raw', 'data': raw[:1000]}
 
-    def flush_current():
-        """将当前请求归档并重置"""
-        nonlocal current, section, stream_chunks
-        if current is None:
-            return
-        if section == 'RESPONSE_BODY' and stream_chunks:
-            current['response_body'] = reconstruct_stream_response(stream_chunks)
-            current['is_stream'] = True
-        current.setdefault('request_body', '')
-        current.setdefault('response_body', '')
-        current.setdefault('is_stream', False)
-        records.append(current)
-        current = None
-        section = 'HEADER'
-        stream_chunks = []
+    # 解析 SSE 事件流
+    events = _parse_sse_events(raw)
 
-    for raw_line in lines:
-        line = raw_line.rstrip('\n')
-        if not line:
-            # 空行在请求体/RESPONSE_BODY 中忽略，在 HEADER 中忽略
+    if not events:
+        return {'type': 'raw', 'data': raw[:1000]}
+
+    # 根据第一个事件判断格式
+    first_data = events[0].get('data', {})
+    if isinstance(first_data, dict):
+        msg_type = first_data.get('type', '')
+        # Anthropic 格式: type 字段为 message_start / content_block_start 等
+        if msg_type in ('message_start', 'ping') or 'message' in first_data:
+            return _assemble_anthropic_sse(events)
+
+    # OpenAI 格式: choices[].delta
+    if isinstance(first_data, dict) and 'choices' in first_data:
+        return _assemble_openai_sse(events)
+
+    # 兜底：尝试两种格式
+    if endpoint_path.endswith('/v1/messages'):
+        return _assemble_anthropic_sse(events)
+    elif endpoint_path.endswith('/v1/chat/completions'):
+        return _assemble_openai_sse(events)
+
+    return _assemble_anthropic_sse(events)
+
+
+def _parse_sse_events(raw: str) -> list[dict]:
+    """将 SSE 文本解析为事件列表 [{event, data}, ...]"""
+    events = []
+    current_event = None
+    current_data_lines = []
+
+    for line in raw.split('\n'):
+        line = line.rstrip()
+
+        if line.startswith('event:'):
+            # 保存上一个事件
+            if current_data_lines:
+                events.append(_build_event(current_event, '\n'.join(current_data_lines)))
+                current_data_lines = []
+            current_event = line[len('event:'):].strip()
+
+        elif line.startswith('data:'):
+            data_str = line[len('data:'):].strip()
+            current_data_lines.append(data_str)
+
+        elif line == '' and current_data_lines:
+            # 空行表示事件结束
+            events.append(_build_event(current_event, '\n'.join(current_data_lines)))
+            current_event = None
+            current_data_lines = []
+
+    # 处理末尾
+    if current_data_lines:
+        events.append(_build_event(current_event, '\n'.join(current_data_lines)))
+
+    return events
+
+
+def _build_event(event_type: str | None, data_str: str) -> dict:
+    """构建单个 SSE 事件"""
+    result = {}
+    if event_type:
+        result['event'] = event_type
+
+    # 尝试解析 data 为 JSON
+    try:
+        result['data'] = json.loads(data_str)
+    except (json.JSONDecodeError, TypeError):
+        if data_str == '[DONE]':
+            result['data'] = '[DONE]'
+        else:
+            result['data'] = data_str
+
+    return result
+
+
+# ==================== Anthropic SSE 拼接 ====================
+
+def _assemble_anthropic_sse(events: list[dict]) -> dict:
+    """
+    拼接 Anthropic SSE 流为完整响应。
+    处理 text_delta（文本）和 input_json_delta（工具调用参数）。
+    """
+    result = {
+        'type': 'anthropic_sse',
+        'model': None,
+        'stop_reason': None,
+        'usage': None,
+        'content': [],  # 最终拼接的 content blocks
+    }
+
+    # 临时存储：按 index 收集 content blocks
+    blocks = {}  # index -> {type, text/name/id/input}
+
+    for evt in events:
+        data = evt.get('data', {})
+        if not isinstance(data, dict):
             continue
 
-        # 分隔线 → 新请求开始
-        sep_match = SEPARATOR_RE.match(line)
-        if sep_match:
-            flush_current()
-            current = {
-                'time_str': sep_match.group(1),
-                'method': '',
-                'path': '',
-                'model': '',
-                'forward_to': '',
-                'duration': '',
-                'status_code': '',
-                'request_body': None,
-                'response_body': None,
-                'error': '',
-                'is_stream': False,
-            }
-            section = 'HEADER'
-            continue
+        evt_type = data.get('type', '')
 
-        if current is None:
-            continue
+        if evt_type == 'message_start':
+            msg = data.get('message', {})
+            result['model'] = msg.get('model')
+            result['usage'] = msg.get('usage')
+            result['id'] = msg.get('id')
 
-        # ---- HEADER 阶段 ----
-        if section == 'HEADER':
-            req_match = REQUEST_RE.match(line)
-            if req_match:
-                parts = req_match.group(1).split(' ', 1)
-                current['method'] = parts[0]
-                current['path'] = parts[1] if len(parts) > 1 else ''
-                continue
+        elif evt_type == 'content_block_start':
+            idx = data.get('index', 0)
+            block = data.get('content_block', {})
+            block_type = block.get('type', 'text')
+            if block_type == 'text':
+                blocks[idx] = {'type': 'text', 'text': block.get('text', '')}
+            elif block_type == 'tool_use':
+                blocks[idx] = {
+                    'type': 'tool_use',
+                    'id': block.get('id', ''),
+                    'name': block.get('name', ''),
+                    'input_json': '',
+                }
+            elif block_type == 'thinking':
+                blocks[idx] = {'type': 'thinking', 'thinking': block.get('thinking', '')}
 
-            model_match = MODEL_RE.match(line)
-            if model_match:
-                current['model'] = model_match.group(1)
-                continue
+        elif evt_type == 'content_block_delta':
+            idx = data.get('index', 0)
+            delta = data.get('delta', {})
+            delta_type = delta.get('type', '')
 
-            forward_match = FORWARD_RE.match(line)
-            if forward_match:
-                current['forward_to'] = forward_match.group(1)
-                continue
+            if idx not in blocks:
+                blocks[idx] = {'type': 'text', 'text': ''}
 
-            duration_match = DURATION_RE.match(line)
-            if duration_match:
-                current['duration'] = duration_match.group(1)
-                continue
+            if delta_type == 'text_delta':
+                blocks[idx].setdefault('text', '')
+                blocks[idx]['text'] += delta.get('text', '')
+            elif delta_type == 'input_json_delta':
+                blocks[idx].setdefault('input_json', '')
+                blocks[idx]['input_json'] += delta.get('partial_json', '')
+            elif delta_type == 'thinking_delta':
+                blocks[idx].setdefault('thinking', '')
+                blocks[idx]['thinking'] += delta.get('thinking', '')
 
-            status_match = STATUS_RE.match(line)
-            if status_match:
-                current['status_code'] = status_match.group(1)
-                continue
+        elif evt_type == 'message_delta':
+            delta = data.get('delta', {})
+            result['stop_reason'] = delta.get('stop_reason')
+            # 合并 usage
+            usage = data.get('usage')
+            if usage:
+                if result['usage']:
+                    result['usage'].update(usage)
+                else:
+                    result['usage'] = usage
 
-            if REQUEST_BODY_RE.match(line):
-                section = 'REQUEST_BODY'
-                current['request_body'] = ''
-                continue
-
-            if RESPONSE_BODY_RE.match(line):
-                # 没有请求体，直接进了响应体
-                section = 'RESPONSE_BODY'
-                current['request_body'] = ''
-                continue
-
-            if ERROR_RE.match(line):
-                current['error'] = ERROR_RE.match(line).group(1)
-                continue
-
-            # HEADER 阶段不识别的行，忽略
-            continue
-
-        # ---- REQUEST_BODY 阶段 ----
-        if section == 'REQUEST_BODY':
-            if REQUEST_BODY_RE.match(line):
-                # 行内容就是 [Request Body]，忽略（已经进入这个 section 了）
-                continue
-            if RESPONSE_BODY_RE.match(line):
-                section = 'RESPONSE_BODY'
-                continue
-            if ERROR_RE.match(line):
-                current['error'] = ERROR_RE.match(line).group(1)
-                section = 'HEADER'
-                continue
-
-            # 请求体内容
-            if current['request_body']:
-                current['request_body'] += '\n' + line
-            else:
-                current['request_body'] = line
-            continue
-
-        # ---- RESPONSE_BODY 阶段 ----
-        if section == 'RESPONSE_BODY':
-            if ERROR_RE.match(line):
-                # 错误在响应体之后
-                if stream_chunks:
-                    current['response_body'] = reconstruct_stream_response(stream_chunks)
-                    current['is_stream'] = True
-                    stream_chunks = []
-                current['error'] = ERROR_RE.match(line).group(1)
-                section = 'HEADER'
-                continue
-
-            done_match = STREAM_DONE_RE.match(line)
-            if done_match:
-                # 流结束
-                current['response_body'] = reconstruct_stream_response(stream_chunks)
-                current['is_stream'] = True
-                stream_chunks = []
-                section = 'HEADER'
-                continue
-
-            data_match = STREAM_DATA_RE.match(line)
-            if data_match:
-                # SSE data: 行
-                stream_chunks.append(data_match.group(1))
-                continue
-
-            # 非 data: 行 -> 非流式响应体（可能是 JSON 或其他）
-            # 但也可能是 data: 在多行间被截断？不处理这种极端情况
-            if current['response_body']:
-                current['response_body'] += '\n' + line
-            else:
-                current['response_body'] = line
-            continue
-
-    # 最终归档
-    flush_current()
-    return records
-
-
-def format_duration(raw):
-    """清理 duration 字符串"""
-    return raw.replace('Duration: ', '').strip() if raw else ''
-
-
-def pretty_print_records(records, args):
-    """美化输出记录"""
-    for i, rec in enumerate(records):
-        print(f"{'='*60}")
-        print(f"请求 #{i+1}  |  {rec['time_str']}")
-        print(f"{'─'*60}")
-        print(f"  方法    : {rec['method']}")
-        print(f"  路径    : {rec['path']}")
-        print(f"  模型    : {rec['model']}")
-        if rec['forward_to']:
-            print(f"  转发至  : {rec['forward_to']}")
-        print(f"  状态码  : {rec['status_code']}  |  耗时: {rec['duration']}")
-        if rec['error']:
-            print(f"  错误    : {rec['error']}")
-
-        # 请求体
-        body_type_label = '流式请求' if rec.get('is_stream_request') else '非流式'
-        if rec['request_body'] and not args.no_body:
-            print(f"\n  ╭─ Request Body ({body_type_label}) " + '─'*35)
+    # 整理 content blocks（按 index 排序）
+    for idx in sorted(blocks.keys()):
+        block = blocks[idx]
+        if block['type'] == 'tool_use':
+            # 尝试解析拼接的 JSON 字符串
+            input_str = block.get('input_json', '')
             try:
-                parsed = json.loads(rec['request_body'])
-                for line in json.dumps(parsed, ensure_ascii=False, indent=2).split('\n'):
-                    print(f"  │ {line}")
-            except (json.JSONDecodeError, TypeError):
-                for line in rec['request_body'].split('\n'):
-                    print(f"  │ {line}")
-            print(f"  ╰{'─'*55}")
+                block['input'] = json.loads(input_str)
+            except json.JSONDecodeError:
+                block['input'] = input_str
+            del block['input_json']
+        result['content'].append(block)
 
-        # 响应体
-        if rec['response_body'] and not args.no_body:
-            resp_label = '流式响应 (已拼接)' if rec['is_stream'] else '非流式响应'
-            print(f"\n  ╭─ Response Body ({resp_label}) " + '─'*28)
-            print(f"  │ {rec['response_body']}")
-            print(f"  ╰{'─'*55}")
-        print()
-
-    print(f"{'='*60}")
-    print(f"共 {len(records)} 个请求")
+    return result
 
 
-def json_output(records, args):
-    """以 JSON 数组格式输出"""
-    output = []
-    for rec in records:
-        entry = {
-            'time': rec['time_str'],
-            'method': rec['method'],
-            'path': rec['path'],
-            'model': rec['model'],
-            'forward_to': rec.get('forward_to', ''),
-            'duration': rec.get('duration', ''),
-            'status_code': rec.get('status_code', ''),
-            'error': rec.get('error', ''),
-            'is_stream': rec.get('is_stream', False),
-        }
-        if not args.no_body:
-            entry['request_body'] = rec.get('request_body', '')
-            entry['response_body'] = rec.get('response_body', '')
-        output.append(entry)
-    print(json.dumps(output, ensure_ascii=False, indent=2))
+# ==================== OpenAI SSE 拼接 ====================
+
+def _assemble_openai_sse(events: list[dict]) -> dict:
+    """
+    拼接 OpenAI SSE 流为完整响应。
+    处理 choices[].delta.content / tool_calls 等。
+    """
+    result = {
+        'type': 'openai_sse',
+        'model': None,
+        'finish_reason': None,
+        'usage': None,
+        'content': '',
+        'tool_calls': [],
+    }
+
+    # 按 index 收集 tool_calls
+    tool_calls_map = {}  # index -> {id, type, function: {name, arguments}}
+
+    for evt in events:
+        data = evt.get('data', {})
+        if not isinstance(data, dict):
+            continue
+
+        if not result['model'] and 'model' in data:
+            result['model'] = data['model']
+
+        if 'usage' in data and data['usage']:
+            result['usage'] = data['usage']
+
+        choices = data.get('choices', [])
+        for choice in choices:
+            delta = choice.get('delta', {})
+            finish = choice.get('finish_reason')
+            if finish:
+                result['finish_reason'] = finish
+
+            # 文本内容
+            if 'content' in delta and delta['content']:
+                result['content'] += delta['content']
+
+            # 推理内容 (reasoning_content)
+            if 'reasoning_content' in delta and delta['reasoning_content']:
+                result.setdefault('reasoning_content', '')
+                result['reasoning_content'] += delta['reasoning_content']
+
+            # 工具调用
+            if 'tool_calls' in delta:
+                for tc in delta['tool_calls']:
+                    tc_idx = tc.get('index', 0)
+                    if tc_idx not in tool_calls_map:
+                        tool_calls_map[tc_idx] = {
+                            'id': tc.get('id', ''),
+                            'type': tc.get('type', 'function'),
+                            'function': {'name': '', 'arguments': ''},
+                        }
+                    entry = tool_calls_map[tc_idx]
+                    if tc.get('id'):
+                        entry['id'] = tc['id']
+                    func = tc.get('function', {})
+                    if func.get('name'):
+                        entry['function']['name'] = func['name']
+                    if func.get('arguments'):
+                        entry['function']['arguments'] += func['arguments']
+
+    # 整理 tool_calls
+    for idx in sorted(tool_calls_map.keys()):
+        tc = tool_calls_map[idx]
+        # 尝试解析 arguments JSON
+        try:
+            tc['function']['arguments'] = json.loads(tc['function']['arguments'])
+        except json.JSONDecodeError:
+            pass
+        result['tool_calls'].append(tc)
+
+    if not result['tool_calls']:
+        del result['tool_calls']
+
+    return result
+
+
+# ==================== 主流程 ====================
+
+def parse_log_entry(entry: dict) -> dict:
+    """解析单条日志条目为结构化数据"""
+    lines = entry['lines']
+    meta, body_start = parse_metadata(lines)
+    req_raw, resp_raw = split_request_response(lines, body_start)
+
+    # 确定 endpoint 路径（用于判断 SSE 格式）
+    endpoint_path = meta.get('path', '')
+
+    record = {
+        'timestamp': entry['timestamp'],
+        **meta,
+        'request': parse_request_body(req_raw),
+        'response': parse_sse_response(resp_raw, endpoint_path),
+    }
+
+    return record
+
+
+def parse_log_file(filepath: str) -> list[dict]:
+    """解析整个日志文件"""
+    entries = split_log_entries(filepath)
+    results = []
+    for i, entry in enumerate(entries):
+        try:
+            record = parse_log_entry(entry)
+            record['index'] = i
+            results.append(record)
+        except Exception as e:
+            results.append({
+                'index': i,
+                'timestamp': entry.get('timestamp', ''),
+                'error': f'解析失败: {str(e)}',
+            })
+    return results
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description='解析 llm_proxy_requests.log，拼接流式响应',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__,
-    )
-    parser.add_argument('log_file', nargs='?',
-                        default='/Volumes/Development/llm_proxy/llm_proxy/llm_proxy_requests.log',
-                        help='日志文件路径（默认: llm_proxy_requests.log）')
-    parser.add_argument('-o', '--output', help='输出到文件')
-    parser.add_argument('--no-body', action='store_true', help='不显示请求/响应体')
-    parser.add_argument('-n', '--last', type=int, default=0,
-                        help='只显示最近 N 个请求（0=全部）')
-    parser.add_argument('--json', action='store_true', help='以 JSON 格式输出')
-    parser.add_argument('--no-color', action='store_true', help='不输出 ANSI 颜色')
+    parser = argparse.ArgumentParser(description='解析 llm_proxy 请求日志')
+    parser.add_argument('logfile', help='日志文件路径')
+    parser.add_argument('-o', '--output', help='输出 JSON 文件路径（默认输出到 stdout）')
+    parser.add_argument('--pretty', action='store_true', default=True, help='格式化 JSON 输出')
+    parser.add_argument('--summary', action='store_true', help='只输出摘要信息')
     args = parser.parse_args()
 
-    records = parse_log(args.log_file)
+    records = parse_log_file(args.logfile)
 
-    if args.last > 0:
-        records = records[-args.last:]
+    if args.summary:
+        # 摘要模式：只输出关键信息
+        summary = []
+        for r in records:
+            s = {
+                'index': r.get('index'),
+                'timestamp': r.get('timestamp'),
+                'model': r.get('model'),
+                'path': r.get('path'),
+                'status_code': r.get('status_code'),
+                'duration_ms': r.get('duration_ms'),
+            }
+            resp = r.get('response', {})
+            resp_type = resp.get('type', '')
+            s['response_type'] = resp_type
 
-    out_func = json_output if args.json else pretty_print_records
+            # 提取响应文本摘要
+            if resp_type == 'anthropic_sse':
+                texts = [b['text'] for b in resp.get('content', []) if b.get('type') == 'text']
+                s['response_text_preview'] = _truncate(''.join(texts), 200)
+                s['stop_reason'] = resp.get('stop_reason')
+                tool_names = [b['name'] for b in resp.get('content', []) if b.get('type') == 'tool_use']
+                if tool_names:
+                    s['tool_calls'] = tool_names
+            elif resp_type == 'openai_sse':
+                s['response_text_preview'] = _truncate(resp.get('content', ''), 200)
+                s['finish_reason'] = resp.get('finish_reason')
+                tool_names = [tc['function']['name'] for tc in resp.get('tool_calls', [])]
+                if tool_names:
+                    s['tool_calls'] = tool_names
+
+            summary.append(s)
+        output_data = summary
+    else:
+        output_data = records
+
+    indent = 2 if args.pretty else None
+    json_str = json.dumps(output_data, ensure_ascii=False, indent=indent)
 
     if args.output:
         with open(args.output, 'w', encoding='utf-8') as f:
-            old_stdout = sys.stdout
-            sys.stdout = f
-            out_func(records, args)
-            sys.stdout = old_stdout
-        print(f'结果已输出到: {args.output}')
+            f.write(json_str)
+        print(f'已输出 {len(records)} 条记录到 {args.output}')
     else:
-        out_func(records, args)
+        print(json_str)
 
 
 if __name__ == '__main__':
