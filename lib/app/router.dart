@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:llm_proxy/features/proxy/presentation/pages/dashboard_page.dart';
 import 'package:llm_proxy/features/rules/presentation/pages/config_page.dart';
 import 'package:llm_proxy/features/logs/presentation/pages/log_page.dart';
-import 'package:llm_proxy/features/logs/presentation/pages/log_output_page.dart';
+import 'package:llm_proxy/features/logs/presentation/pages/file_log_page.dart';
 import 'package:llm_proxy/features/settings/presentation/pages/settings_page.dart';
 
 /// 无过渡动画的页面构建器

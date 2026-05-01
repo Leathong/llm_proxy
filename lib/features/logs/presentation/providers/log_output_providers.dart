@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:llm_proxy/features/logs/data/datasources/log_file_parser.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 
 /// 日志输出文件的加载状态
@@ -38,7 +39,7 @@ class LogOutputNotifier extends Notifier<LogOutputState> {
   @override
   LogOutputState build() => const LogOutputState();
 
-  /// 从指定路径加载 JSON 日志文件
+  /// 从指定路径加载日志文件（自动识别 .log 和 .json 格式）
   Future<void> loadFile(String path) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
@@ -48,13 +49,19 @@ class LogOutputNotifier extends Notifier<LogOutputState> {
         return;
       }
 
-      final content = await file.readAsString();
-      final list = jsonDecode(content) as List<dynamic>;
-      final entries = <LogOutputEntry>[];
-      for (var i = 0; i < list.length; i++) {
-        entries.add(
-          LogOutputEntry.fromJson(list[i] as Map<String, dynamic>, i),
-        );
+      final List<LogOutputEntry> entries;
+
+      if (path.endsWith('.log')) {
+        // .log 文本文件：使用内置解析器（Isolate 中执行）
+        entries = await LogFileParser.parseFile(path);
+      } else {
+        // .json 文件：直接解析
+        final content = await file.readAsString();
+        final list = jsonDecode(content) as List<dynamic>;
+        entries = [
+          for (var i = 0; i < list.length; i++)
+            LogOutputEntry.fromJson(list[i] as Map<String, dynamic>, i),
+        ];
       }
 
       state = LogOutputState(

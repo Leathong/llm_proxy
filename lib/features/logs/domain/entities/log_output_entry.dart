@@ -49,12 +49,21 @@ class LogOutputRequest {
   final String? model;
   final bool? stream;
   final List<LogOutputMessage> messages;
+  /// system prompt 内容（截断后的文本预览）
+  final String? systemPreview;
+  /// system prompt 完整内容
+  final String? systemFull;
+  /// 工具定义列表（仅保留名称和描述摘要）
+  final List<LogOutputToolDef>? tools;
   final Map<String, dynamic>? otherParams;
 
   const LogOutputRequest({
     this.model,
     this.stream,
     required this.messages,
+    this.systemPreview,
+    this.systemFull,
+    this.tools,
     this.otherParams,
   });
 
@@ -65,6 +74,11 @@ class LogOutputRequest {
       stream: json['stream'] as bool?,
       messages: rawMessages
           .map((m) => LogOutputMessage.fromJson(m as Map<String, dynamic>))
+          .toList(),
+      systemPreview: json['system_preview'] as String?,
+      systemFull: json['system_full'] as String?,
+      tools: (json['tools'] as List<dynamic>?)
+          ?.map((t) => LogOutputToolDef.fromJson(t as Map<String, dynamic>))
           .toList(),
       otherParams: json['other_params'] as Map<String, dynamic>?,
     );
@@ -231,6 +245,32 @@ class LogOutputContentBlock {
       id: json['id'] as String?,
       name: json['name'] as String?,
       input: json['input'] as Map<String, dynamic>?,
+    );
+  }
+}
+
+/// 工具定义（请求体中的 tools 数组元素）
+class LogOutputToolDef {
+  final String name;
+  final String? descriptionPreview;
+  /// 完整描述文本（用于弹窗展示）
+  final String? description;
+  /// 工具参数 schema（用于弹窗展示）
+  final Map<String, dynamic>? inputSchema;
+
+  const LogOutputToolDef({
+    required this.name,
+    this.descriptionPreview,
+    this.description,
+    this.inputSchema,
+  });
+
+  factory LogOutputToolDef.fromJson(Map<String, dynamic> json) {
+    return LogOutputToolDef(
+      name: json['name'] as String? ?? '',
+      descriptionPreview: json['description_preview'] as String?,
+      description: json['description'] as String?,
+      inputSchema: json['input_schema'] as Map<String, dynamic>?,
     );
   }
 }

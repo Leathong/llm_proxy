@@ -1,0 +1,124 @@
+import 'package:flutter/material.dart';
+import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
+import 'package:llm_proxy/features/logs/presentation/widgets/log_output_detail.dart';
+
+/// 单条日志条目
+class LogOutputItem extends StatelessWidget {
+  final LogOutputEntry entry;
+
+  const LogOutputItem({super.key, required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    // 状态码颜色
+    Color statusColor;
+    if (entry.statusCode != null) {
+      if (entry.statusCode! >= 200 && entry.statusCode! < 300) {
+        statusColor = Colors.green;
+      } else if (entry.statusCode! >= 400) {
+        statusColor = Colors.red;
+      } else {
+        statusColor = Colors.orange;
+      }
+    } else {
+      statusColor = Colors.grey;
+    }
+
+    final messageCount = entry.request?.messages.length ?? 0;
+    final usage = entry.response?.usage;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      elevation: 1,
+      child: ExpansionTile(
+        // 标题行：序号 + 状态码 + 方法 + 路径 + 耗时
+        title: Row(
+          children: [
+            SizedBox(
+              width: 28,
+              child: Text('#${entry.index}',
+                  style: const TextStyle(color: Colors.grey, fontSize: 11)),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: statusColor, width: 1),
+              ),
+              child: Text('${entry.statusCode ?? "N/A"}',
+                  style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11)),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(entry.method,
+                  style: const TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11)),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(entry.path,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                  overflow: TextOverflow.ellipsis),
+            ),
+            if (entry.durationMs != null)
+              Text('${entry.durationMs}ms',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          ],
+        ),
+        // 副标题：时间 + 模型 + 消息数
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Row(
+            children: [
+              Text(entry.timestamp,
+                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              if (entry.model != null) ...[
+                const SizedBox(width: 8),
+                const Icon(Icons.psychology, size: 14, color: Colors.grey),
+                const SizedBox(width: 4),
+                Text(entry.model!,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+              const Spacer(),
+              if (entry.request?.systemPreview != null) ...[
+                const Icon(Icons.settings, size: 13, color: Colors.purple),
+                const SizedBox(width: 4),
+              ],
+              if (entry.request?.tools != null) ...[
+                const Icon(Icons.build, size: 13, color: Colors.amber),
+                const SizedBox(width: 2),
+                Text('${entry.request!.tools!.length}',
+                    style:
+                        const TextStyle(color: Colors.amber, fontSize: 11)),
+                const SizedBox(width: 6),
+              ],
+              if (messageCount > 0)
+                Text('$messageCount 条消息',
+                    style: const TextStyle(color: Colors.grey, fontSize: 11)),
+              if (usage != null) ...[
+                const SizedBox(width: 8),
+                const Icon(Icons.token, size: 13, color: Colors.grey),
+                const SizedBox(width: 2),
+                Text('${usage.totalInputTokens}→${usage.outputTokens ?? 0}',
+                    style: const TextStyle(color: Colors.grey, fontSize: 11)),
+              ],
+            ],
+          ),
+        ),
+        // 展开后显示详情
+        children: [LogOutputDetail(entry: entry)],
+      ),
+    );
+  }
+}
