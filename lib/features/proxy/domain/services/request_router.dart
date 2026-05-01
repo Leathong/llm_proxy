@@ -220,6 +220,25 @@ class RequestRouter {
         endpointApiKey: selectedEndpoint.apiKey,
       );
 
+      // 客户端断开连接，记录日志后直接返回
+      if (result.clientDisconnected) {
+        logger.log('客户端已断开连接，上游请求已取消');
+        logger.update(
+          id: logId, time: startTime, method: request.method,
+          path: request.uri.path, model: requestedModelId,
+          targetEndpoint: targetUrl, statusCode: result.statusCode,
+          status: LogStatus.error, error: 'Client disconnected',
+        );
+        logWriter.writeLog(
+          time: startTime, method: request.method, path: request.uri.path,
+          requestBody: modifiedBodyStr, statusCode: result.statusCode,
+          responseBody: result.responseBody, error: 'Client disconnected',
+          model: requestedModelId, targetEndpoint: targetUrl,
+          requestDurationMs: DateTime.now().difference(startTime).inMilliseconds,
+        );
+        return;
+      }
+
       logger.log('请求转发完成，状态码: ${result.statusCode}');
       logger.update(
         id: logId, time: startTime, method: request.method,
