@@ -42,6 +42,7 @@ class DriftRuleRepository implements RuleRepository {
       result.add(entity.Rule(
         id: rule.id,
         name: rule.name,
+        groupName: rule.groupName,
         endpoints: endpoints,
         customModelId: rule.customModelId,
         targetModelId: rule.targetModelId,
@@ -60,6 +61,7 @@ class DriftRuleRepository implements RuleRepository {
     return _db.transaction(() async {
       final ruleId = await _db.into(_db.rules).insert(db.RulesCompanion.insert(
             name: rule.name,
+            groupName: Value(rule.groupName),
             customModelId: rule.customModelId,
             targetModelId: rule.targetModelId,
             active: Value(rule.active),
@@ -109,6 +111,7 @@ class DriftRuleRepository implements RuleRepository {
       return entity.Rule(
         id: ruleId,
         name: rule.name,
+        groupName: rule.groupName,
         endpoints: resolvedEndpoints,
         customModelId: rule.customModelId,
         targetModelId: rule.targetModelId,
@@ -126,6 +129,7 @@ class DriftRuleRepository implements RuleRepository {
       await (_db.update(_db.rules)..where((r) => r.id.equals(rule.id))).write(
         db.RulesCompanion(
           name: Value(rule.name),
+          groupName: Value(rule.groupName),
           customModelId: Value(rule.customModelId),
           targetModelId: Value(rule.targetModelId),
           active: Value(rule.active),

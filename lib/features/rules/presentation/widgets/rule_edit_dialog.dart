@@ -16,6 +16,7 @@ class RuleEditDialog extends ConsumerStatefulWidget {
 class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
   final _formKey = GlobalKey<FormState>();
   late String _name;
+  late String _groupName;
   late String _customModelId;
   late String _targetModelId;
   late bool _active;
@@ -28,6 +29,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
   void initState() {
     super.initState();
     _name = widget.rule?.name ?? '';
+    _groupName = widget.rule?.groupName ?? '';
     _customModelId = widget.rule?.customModelId ?? '';
     _targetModelId = widget.rule?.targetModelId ?? '';
     _active = widget.rule?.active ?? true;
@@ -134,6 +136,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
     return Rule(
       id: overrideId ?? widget.rule?.id ?? 0,
       name: _name,
+      groupName: _groupName,
       endpoints: _buildEndpoints(),
       customModelId: _customModelId,
       targetModelId: _targetModelId,
@@ -162,6 +165,14 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                   validator: (val) =>
                       val == null || val.isEmpty ? '请输入规则名称' : null,
                   onSaved: (val) => _name = val!,
+                ),
+                TextFormField(
+                  initialValue: _groupName,
+                  decoration: const InputDecoration(
+                    labelText: '分组名称',
+                    hintText: '留空表示默认分组',
+                  ),
+                  onSaved: (val) => _groupName = val ?? '',
                 ),
                 TextFormField(
                   initialValue: _customModelId,

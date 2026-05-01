@@ -3,6 +3,7 @@ import 'package:llm_proxy/features/rules/domain/entities/endpoint_config.dart';
 class Rule {
   final int id;
   final String name;
+  final String groupName;
   final List<EndpointConfig> endpoints;
   final String customModelId;
   final String targetModelId;
@@ -13,6 +14,7 @@ class Rule {
   const Rule({
     required this.id,
     required this.name,
+    this.groupName = '',
     this.endpoints = const [],
     required this.customModelId,
     required this.targetModelId,
@@ -27,6 +29,7 @@ class Rule {
   Rule copyWith({
     int? id,
     String? name,
+    String? groupName,
     List<EndpointConfig>? endpoints,
     String? customModelId,
     String? targetModelId,
@@ -37,6 +40,7 @@ class Rule {
     return Rule(
       id: id ?? this.id,
       name: name ?? this.name,
+      groupName: groupName ?? this.groupName,
       endpoints: endpoints ?? this.endpoints,
       customModelId: customModelId ?? this.customModelId,
       targetModelId: targetModelId ?? this.targetModelId,

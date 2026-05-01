@@ -4,29 +4,114 @@ import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
 import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.dart';
 import 'package:llm_proxy/features/rules/presentation/widgets/rule_edit_dialog.dart';
 
-class ConfigPage extends ConsumerWidget {
+/// 默认分组名（groupName 为空时归入此组）
+const _kDefaultGroup = '默认';
+
+class ConfigPage extends ConsumerStatefulWidget {
   const ConfigPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ConfigPage> createState() => _ConfigPageState();
+}
+
+class _ConfigPageState extends ConsumerState<ConfigPage>
+    with TickerProviderStateMixin {
+  TabController? _tabController;
+
+  /// 当前各分组名列表（有序，默认组在最前）
+  List<String> _groups = [];
+
+  /// 根据规则列表构建分组并同步 TabController
+  void _syncTabs(List<Rule> rules) {
+    final groupSet = <String>{};
+    for (final r in rules) {
+      groupSet.add(r.groupName.isEmpty ? _kDefaultGroup : r.groupName);
+    }
+
+    // 保证"默认"在最前，其余按字母排序
+    final sorted = groupSet.toList()
+      ..sort((a, b) {
+        if (a == _kDefaultGroup) return -1;
+        if (b == _kDefaultGroup) return 1;
+        return a.compareTo(b);
+      });
+
+    // 仅在分组列表变化时重建 TabController
+    if (_listEquals(sorted, _groups)) return;
+
+    final oldIndex = _tabController?.index ?? 0;
+    _tabController?.dispose();
+
+    _groups = sorted;
+    _tabController = TabController(
+      length: _groups.length,
+      vsync: this,
+      initialIndex: oldIndex.clamp(0, _groups.length - 1),
+    );
+  }
+
+  bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  void dispose() {
+    _tabController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final rulesAsync = ref.watch(rulesProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('规则配置')),
-      body: rulesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('加载失败: $e')),
-        data: (rules) => rules.isEmpty
-            ? const Center(
-                child: Text('暂无代理规则，请点击右下角添加'),
-              )
-            : ListView.builder(
-                itemCount: rules.length,
+    return rulesAsync.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Scaffold(
+        body: Center(child: Text('加载失败: $e')),
+      ),
+      data: (rules) {
+        if (rules.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: const Center(child: Text('暂无代理规则，请点击右下角添加')),
+            floatingActionButton: _buildFab(),
+          );
+        }
+
+        _syncTabs(rules);
+
+        return Scaffold(
+          appBar: AppBar(
+            // 用 TabBar 替换原来的 title
+            title: TabBar(
+              controller: _tabController,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              tabs: _groups.map((g) => Tab(text: g)).toList(),
+            ),
+          ),
+          body: TabBarView(
+            controller: _tabController,
+            children: _groups.map((group) {
+              // 筛选当前分组的规则
+              final groupRules = rules.where((r) {
+                final g = r.groupName.isEmpty ? _kDefaultGroup : r.groupName;
+                return g == group;
+              }).toList();
+
+              return ListView.builder(
+                itemCount: groupRules.length,
                 itemBuilder: (context, index) {
-                  final rule = rules[index];
+                  final rule = groupRules[index];
                   return Card(
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    margin: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
                     child: ListTile(
                       title: Text(rule.name),
                       subtitle: Text(
@@ -38,33 +123,40 @@ class ConfigPage extends ConsumerWidget {
                         scale: 0.75,
                         child: Switch(
                           value: rule.active,
-                          onChanged: (val) =>
-                              ref.read(rulesProvider.notifier).toggle(rule.id, val),
+                          onChanged: (val) => ref
+                              .read(rulesProvider.notifier)
+                              .toggle(rule.id, val),
                         ),
                       ),
-                      onTap: () => _showRuleDialog(context, ref, rule: rule),
-                      onLongPress: () =>
-                          _showDeleteDialog(context, ref, rule),
+                      onTap: () => _showRuleDialog(rule: rule),
+                      onLongPress: () => _showDeleteDialog(rule),
                     ),
                   );
                 },
-              ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showRuleDialog(context, ref),
-        child: const Icon(Icons.add),
-      ),
+              );
+            }).toList(),
+          ),
+          floatingActionButton: _buildFab(),
+        );
+      },
     );
   }
 
-  void _showRuleDialog(BuildContext context, WidgetRef ref, {Rule? rule}) {
+  Widget _buildFab() {
+    return FloatingActionButton(
+      onPressed: () => _showRuleDialog(),
+      child: const Icon(Icons.add),
+    );
+  }
+
+  void _showRuleDialog({Rule? rule}) {
     showDialog(
       context: context,
       builder: (context) => RuleEditDialog(rule: rule),
     );
   }
 
-  void _showDeleteDialog(BuildContext context, WidgetRef ref, Rule rule) {
+  void _showDeleteDialog(Rule rule) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(

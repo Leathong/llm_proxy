@@ -25,6 +25,7 @@ class Endpoints extends Table {
 class Rules extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text()();
+  TextColumn get groupName => text().withDefault(const Constant(''))();
   TextColumn get customModelId => text()();
   TextColumn get targetModelId => text()();
   BoolColumn get active => boolean().withDefault(const Constant(true))();
@@ -57,7 +58,19 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (migrator, from, to) async {
+          if (from < 2) {
+            // v2: rules 表新增 groupName 列
+            await customStatement(
+              "ALTER TABLE rules ADD COLUMN group_name TEXT NOT NULL DEFAULT ''",
+            );
+          }
+        },
+      );
 }
 
 LazyDatabase _openConnection() {
