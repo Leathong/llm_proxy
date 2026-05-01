@@ -275,10 +275,63 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             if (settings.logFilePath.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(top: 4, left: 110),
-                child: Text(
-                  '日志将追加写入: ${settings.logFilePath}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                padding: const EdgeInsets.only(top: 8, left: 110),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '日志将追加写入: ${settings.logFilePath}',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: () async {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('确认清空'),
+                            content: const Text('确定要清空日志文件内容吗？此操作不可撤销。'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(false),
+                                child: const Text('取消'),
+                              ),
+                              FilledButton(
+                                onPressed: () => Navigator.of(context).pop(true),
+                                child: const Text('清空'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed == true) {
+                          try {
+                            final file = File(settings.logFilePath);
+                            if (await file.exists()) {
+                              await file.writeAsString('');
+                            }
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('日志文件已清空')),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('清空日志失败: $e')),
+                              );
+                            }
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.delete_outline, size: 16),
+                      label: const Text('清空日志文件'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             const Divider(height: 40),
