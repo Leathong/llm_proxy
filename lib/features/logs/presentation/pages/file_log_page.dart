@@ -2,7 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_proxy/features/logs/presentation/providers/log_output_providers.dart';
-import 'package:llm_proxy/features/logs/presentation/widgets/log_output_item.dart';
+import 'package:llm_proxy/features/logs/presentation/widgets/file_log_item.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_summary_bar.dart';
 
 class LogOutputPage extends ConsumerWidget {
@@ -93,7 +93,7 @@ class LogOutputPage extends ConsumerWidget {
           child: ListView.builder(
             itemCount: state.entries.length,
             itemBuilder: (context, index) =>
-                LogOutputItem(entry: state.entries[index]),
+                FileLogItem(entry: state.entries[index]),
           ),
         ),
       ],

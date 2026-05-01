@@ -1,12 +1,62 @@
 import 'package:flutter/material.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
-import 'package:llm_proxy/features/logs/presentation/widgets/log_output_detail.dart';
+import 'package:llm_proxy/features/logs/presentation/widgets/file_log_detail.dart';
 
-/// 单条日志条目
-class LogOutputItem extends StatelessWidget {
+/// 单条日志条目，展开后点击空白区域可收起
+class FileLogItem extends StatefulWidget {
   final LogOutputEntry entry;
 
-  const LogOutputItem({super.key, required this.entry});
+  const FileLogItem({super.key, required this.entry});
+
+  @override
+  State<FileLogItem> createState() => _FileLogItemState();
+}
+
+class _FileLogItemState extends State<FileLogItem> {
+  final _controller = ExpansibleController();
+  final _key = GlobalKey();
+
+  LogOutputEntry get entry => widget.entry;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// 标记是否由我们主动触发收起（区分 title 点击收起 vs GestureDetector 收起）
+  bool _collapsingByUs = false;
+
+  /// 点击展开内容区域收起：先滚回可视区域，再执行收起
+  Future<void> _scrollThenCollapse() async {
+    final ctx = _key.currentContext;
+    if (ctx != null) {
+      await Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+      );
+    }
+    _collapsingByUs = true;
+    _controller.collapse();
+  }
+
+  /// 处理 ExpansionTile 通过 title 点击触发的收起（非我们主动触发时补偿滚动）
+  void _onExpansionChanged(bool expanded) {
+    if (!expanded && !_collapsingByUs) {
+      Future.delayed(const Duration(milliseconds: 250), () {
+        final ctx = _key.currentContext;
+        if (ctx != null && ctx.mounted) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
+    }
+    _collapsingByUs = false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,9 +78,12 @@ class LogOutputItem extends StatelessWidget {
     final usage = entry.response?.usage;
 
     return Card(
+      key: _key,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       elevation: 1,
       child: ExpansionTile(
+        controller: _controller,
+        onExpansionChanged: _onExpansionChanged,
         // 标题行：序号 + 状态码 + 方法 + 路径 + 耗时
         title: Row(
           children: [
@@ -116,8 +169,14 @@ class LogOutputItem extends StatelessWidget {
             ],
           ),
         ),
-        // 展开后显示详情
-        children: [LogOutputDetail(entry: entry)],
+        // 展开后显示详情，点击空白区域收起
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: _scrollThenCollapse,
+            child: FileLogDetail(entry: entry),
+          ),
+        ],
       ),
     );
   }

@@ -75,7 +75,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         if (!unique.contains(p)) unique.add(p);
       }
       await ref.read(settingsProvider.notifier).setCertDomains(unique);
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('证书域名已保存')),
         );
@@ -132,7 +132,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
       if (result.exitCode == 0) {
         await ref.read(settingsProvider.notifier).setCertPaths(certPath, keyPath);
-        if (context.mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('证书生成成功并已保存配置')),
           );
@@ -142,13 +142,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       }
     } catch (e, stackTrace) {
       debugPrint('【证书生成错误】: $e\n$stackTrace');
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('生成证书失败: $e')),
         );
       }
     } finally {
-      if (context.mounted) setState(() => _isGenerating = false);
+      if (mounted) setState(() => _isGenerating = false);
     }
   }
 

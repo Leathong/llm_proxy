@@ -6,10 +6,10 @@ import 'package:llm_proxy/features/logs/presentation/widgets/message_widgets.dar
 import 'package:llm_proxy/features/logs/presentation/widgets/response_content.dart';
 
 /// 日志详情面板
-class LogOutputDetail extends StatelessWidget {
+class FileLogDetail extends StatelessWidget {
   final LogOutputEntry entry;
 
-  const LogOutputDetail({super.key, required this.entry});
+  const FileLogDetail({super.key, required this.entry});
 
   @override
   Widget build(BuildContext context) {
