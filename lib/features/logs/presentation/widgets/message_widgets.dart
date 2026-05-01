@@ -23,7 +23,6 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 角色对应的颜色和图标
     final (Color roleColor, IconData roleIcon) = switch (message.role) {
       'user' => (Colors.blue, Icons.person),
       'assistant' => (Colors.green, Icons.smart_toy),
@@ -59,7 +58,6 @@ class _MessageBubble extends StatelessWidget {
             ),
           ],
         ),
-        // 工具调用标记
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -97,20 +95,40 @@ class _MessageBubble extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 消息文本
+                // 消息文本（被截断时可点击查看完整内容）
                 if (message.text != null && message.text!.isNotEmpty)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: SelectableText(
-                      message.text!,
-                      style: const TextStyle(fontSize: 12, height: 1.5),
+                  GestureDetector(
+                    onTap: message.textFull != null
+                        ? () => _showFullTextDialog(
+                            context, message.role, message.textFull!)
+                        : null,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SelectableText(
+                            message.text!,
+                            style:
+                                const TextStyle(fontSize: 12, height: 1.5),
+                          ),
+                          if (message.textFull != null) ...[
+                            const SizedBox(height: 6),
+                            Text('点击查看完整内容',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.blue
+                                        .withValues(alpha: 0.6))),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
 
@@ -143,6 +161,17 @@ class _MessageBubble extends StatelessWidget {
     }
     return '(空)';
   }
+
+  void _showFullTextDialog(
+      BuildContext context, String role, String fullText) {
+    _showDetailDialog(
+      context,
+      title: '${role.toUpperCase()} 消息',
+      icon: Icons.chat,
+      iconColor: Colors.blue,
+      content: fullText,
+    );
+  }
 }
 
 /// 工具调用卡片
@@ -153,35 +182,54 @@ class ToolUseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.amber.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.amber.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.build, size: 14, color: Colors.amber),
-              const SizedBox(width: 6),
-              Text(toolUse.name,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 12)),
-              const Spacer(),
-              Text(toolUse.id,
-                  style: const TextStyle(color: Colors.grey, fontSize: 10)),
+    return GestureDetector(
+      onTap: toolUse.inputFull != null
+          ? () => _showDetailDialog(
+                context,
+                title: toolUse.name,
+                icon: Icons.build,
+                iconColor: Colors.amber,
+                content: toolUse.inputFull!,
+              )
+          : null,
+      child: Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.amber.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.amber.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.build, size: 14, color: Colors.amber),
+                const SizedBox(width: 6),
+                Text(toolUse.name,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 12)),
+                const Spacer(),
+                Text(toolUse.id,
+                    style:
+                        const TextStyle(color: Colors.grey, fontSize: 10)),
+              ],
+            ),
+            if (toolUse.inputPreview != null) ...[
+              const SizedBox(height: 6),
+              SelectableText(toolUse.inputPreview!,
+                  style: const TextStyle(fontSize: 11, color: Colors.grey)),
             ],
-          ),
-          if (toolUse.inputPreview != null) ...[
-            const SizedBox(height: 6),
-            SelectableText(toolUse.inputPreview!,
-                style: const TextStyle(fontSize: 11, color: Colors.grey)),
+            if (toolUse.inputFull != null) ...[
+              const SizedBox(height: 4),
+              Text('点击查看完整内容',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.amber.withValues(alpha: 0.7))),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -195,36 +243,112 @@ class ToolResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.teal.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.teal.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.assignment_returned,
-                  size: 14, color: Colors.teal),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text('结果 → ${result.toolUseId}',
-                    style: const TextStyle(fontSize: 11, color: Colors.teal),
-                    overflow: TextOverflow.ellipsis),
-              ),
+    return GestureDetector(
+      onTap: result.contentFull != null
+          ? () => _showDetailDialog(
+                context,
+                title: '工具结果 → ${result.toolUseId}',
+                icon: Icons.assignment_returned,
+                iconColor: Colors.teal,
+                content: result.contentFull!,
+              )
+          : null,
+      child: Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.teal.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.teal.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.assignment_returned,
+                    size: 14, color: Colors.teal),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text('结果 → ${result.toolUseId}',
+                      style:
+                          const TextStyle(fontSize: 11, color: Colors.teal),
+                      overflow: TextOverflow.ellipsis),
+                ),
+              ],
+            ),
+            if (result.contentPreview != null) ...[
+              const SizedBox(height: 6),
+              SelectableText(result.contentPreview!,
+                  style: const TextStyle(fontSize: 11, color: Colors.grey)),
             ],
-          ),
-          if (result.contentPreview != null) ...[
-            const SizedBox(height: 6),
-            SelectableText(result.contentPreview!,
-                style: const TextStyle(fontSize: 11, color: Colors.grey)),
+            if (result.contentFull != null) ...[
+              const SizedBox(height: 4),
+              Text('点击查看完整内容',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.teal.withValues(alpha: 0.7))),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
+}
+
+/// 通用详情弹窗
+void _showDetailDialog(
+  BuildContext context, {
+  required String title,
+  required IconData icon,
+  required Color iconColor,
+  required String content,
+}) {
+  showDialog(
+    context: context,
+    builder: (context) => Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 700, maxHeight: 600),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 8, 12),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom:
+                      BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, size: 18, color: iconColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(title,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: SelectableText(content,
+                    style: const TextStyle(fontSize: 12, height: 1.6)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

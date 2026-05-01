@@ -174,7 +174,14 @@ class _FileLogItemState extends State<FileLogItem> {
           GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTap: _scrollThenCollapse,
-            child: FileLogDetail(entry: entry),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              // 内部内容吸收点击，避免点击消息等内容时触发收起
+              child: GestureDetector(
+                onTap: () {},
+                child: FileLogDetail(entry: entry),
+              ),
+            ),
           ),
         ],
       ),

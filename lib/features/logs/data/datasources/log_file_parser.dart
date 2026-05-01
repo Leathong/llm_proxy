@@ -255,7 +255,12 @@ class LogFileParser {
     final content = msg['content'];
 
     if (content is String) {
-      return FileLogMessage(role: role, text: _truncate(content, 500));
+      final truncated = _truncate(content, 500);
+      return FileLogMessage(
+        role: role,
+        text: truncated,
+        textFull: truncated != content ? content : null,
+      );
     }
 
     if (content is List) {
@@ -271,31 +276,35 @@ class LogFileParser {
           case 'text':
             textParts.add(item['text'] as String? ?? '');
           case 'tool_use':
+            final inputJson = jsonEncode(item['input'] ?? {});
+            final inputTruncated = _truncate(inputJson, 200);
             toolUses.add(FileLogToolUse(
               name: item['name'] as String? ?? '',
               id: item['id'] as String? ?? '',
-              inputPreview: _truncate(
-                jsonEncode(item['input'] ?? {}),
-                200,
-              ),
+              inputPreview: inputTruncated,
+              inputFull: inputTruncated != inputJson ? inputJson : null,
             ));
           case 'tool_result':
             final c = item['content'];
+            final contentStr = c is String ? c : jsonEncode(c ?? '');
+            final contentTruncated = _truncate(contentStr, 200);
             toolResults.add(FileLogToolResult(
               toolUseId: item['tool_use_id'] as String? ?? '',
-              contentPreview: _truncate(
-                c is String ? c : jsonEncode(c ?? ''),
-                200,
-              ),
+              contentPreview: contentTruncated,
+              contentFull:
+                  contentTruncated != contentStr ? contentStr : null,
             ));
           case 'image':
             textParts.add('[image]');
         }
       }
 
+      final fullText = textParts.join('\n');
+      final truncatedText = _truncate(fullText, 500);
       return FileLogMessage(
         role: role,
-        text: _truncate(textParts.join('\n'), 500),
+        text: truncatedText,
+        textFull: truncatedText != fullText ? fullText : null,
         toolUses: toolUses.isNotEmpty ? toolUses : null,
         toolResults: toolResults.isNotEmpty ? toolResults : null,
       );
@@ -304,6 +313,9 @@ class LogFileParser {
     return FileLogMessage(
       role: role,
       text: content != null ? _truncate(content.toString(), 500) : null,
+      textFull: content != null && content.toString().length > 500
+          ? content.toString()
+          : null,
     );
   }
 

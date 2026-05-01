@@ -89,12 +89,15 @@ class FileLogRequest {
 class FileLogMessage {
   final String role;
   final String? text;
+  /// 完整消息文本（未截断）
+  final String? textFull;
   final List<FileLogToolUse>? toolUses;
   final List<FileLogToolResult>? toolResults;
 
   const FileLogMessage({
     required this.role,
     this.text,
+    this.textFull,
     this.toolUses,
     this.toolResults,
   });
@@ -120,11 +123,14 @@ class FileLogToolUse {
   final String name;
   final String id;
   final String? inputPreview;
+  /// 完整的 input JSON 字符串
+  final String? inputFull;
 
   const FileLogToolUse({
     required this.name,
     required this.id,
     this.inputPreview,
+    this.inputFull,
   });
 
   factory FileLogToolUse.fromJson(Map<String, dynamic> json) {
@@ -140,10 +146,13 @@ class FileLogToolUse {
 class FileLogToolResult {
   final String toolUseId;
   final String? contentPreview;
+  /// 完整的工具结果内容
+  final String? contentFull;
 
   const FileLogToolResult({
     required this.toolUseId,
     this.contentPreview,
+    this.contentFull,
   });
 
   factory FileLogToolResult.fromJson(Map<String, dynamic> json) {
