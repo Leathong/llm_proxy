@@ -50,3 +50,7 @@ llm_proxy_requests.log
 **/*.freezed.dart
 
 .trae
+
+# FVM Version Cache
+.fvm/
+.vscode/
