@@ -5,8 +5,15 @@ import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 class LogSummaryBar extends StatelessWidget {
   final List<FileLogEntry> entries;
   final String? filePath;
+  /// 过滤后的条目（非空时以此为准计算统计）
+  final List<FileLogEntry>? filteredEntries;
 
-  const LogSummaryBar({super.key, required this.entries, this.filePath});
+  const LogSummaryBar({
+    super.key,
+    required this.entries,
+    this.filePath,
+    this.filteredEntries,
+  });
 
   /// 计算百分位耗时（P50/P70/P90 等）
   int _percentile(List<int> sorted, int p) {
@@ -17,8 +24,11 @@ class LogSummaryBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalRequests = entries.length;
-    final successCount = entries
+    // 当有过滤条件时，统计针对过滤后的列表
+    final statsEntries = filteredEntries ?? entries;
+
+    final totalRequests = statsEntries.length;
+    final successCount = statsEntries
         .where((e) =>
             e.statusCode != null &&
             e.statusCode! >= 200 &&
@@ -27,7 +37,7 @@ class LogSummaryBar extends StatelessWidget {
     final errorCount = totalRequests - successCount;
 
     // 排序后的耗时列表，用于百分位计算
-    final durations = entries
+    final durations = statsEntries
         .where((e) => e.durationMs != null)
         .map((e) => e.durationMs!)
         .toList()
@@ -37,7 +47,7 @@ class LogSummaryBar extends StatelessWidget {
     // 汇总 token 用量
     int totalInput = 0;
     int totalOutput = 0;
-    for (final entry in entries) {
+    for (final entry in statsEntries) {
       final usage = entry.response?.usage;
       if (usage != null) {
         totalInput += usage.totalInputTokens;

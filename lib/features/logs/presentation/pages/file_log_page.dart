@@ -13,18 +13,17 @@ class FileLogPage extends ConsumerStatefulWidget {
 }
 
 class _FileLogPageState extends ConsumerState<FileLogPage> {
-  // 是否倒序显示（最新的在前）
   bool _reversed = false;
 
   @override
   Widget build(BuildContext context) {
     final logState = ref.watch(logOutputProvider);
+    final hasFilter = !logState.filter.isEmpty;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('日志分析'),
         actions: [
-          // 加载文件按钮
           IconButton(
             icon: const Icon(Icons.folder_open),
             tooltip: '选择日志文件',
@@ -37,7 +36,16 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
               onPressed: () =>
                   ref.read(logOutputProvider.notifier).loadFile(logState.filePath!),
             ),
-          // 排序切换按钮
+          // Filter 按钮 — 有过滤时高亮
+          if (logState.entries.isNotEmpty)
+            IconButton(
+              icon: Icon(
+                Icons.filter_list,
+                color: hasFilter ? Colors.blue : null,
+              ),
+              tooltip: hasFilter ? '过滤中 (点击修改)' : '过滤',
+              onPressed: () => _showFilterDialog(logState),
+            ),
           if (logState.entries.isNotEmpty)
             IconButton(
               icon: Icon(
@@ -67,6 +75,138 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
     if (result != null && result.files.single.path != null) {
       ref.read(logOutputProvider.notifier).loadFile(result.files.single.path!);
     }
+  }
+
+  /// 弹出过滤对话框
+  Future<void> _showFilterDialog(FileLogState state) async {
+    final filter = state.filter;
+    final models = FileLogFilter.availableModels(state.entries);
+    final forwards = FileLogFilter.availableForwardTos(state.entries);
+    // 临时状态，只在弹窗内有效
+    final keywordCtrl = TextEditingController(text: filter.keyword);
+    var tempModelFilter = filter.modelFilter;
+    var tempForwardToFilter = filter.forwardToFilter;
+    var tempKeyword = filter.keyword;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.filter_list, size: 20, color: Colors.blue),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text('过滤日志',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: keywordCtrl,
+                  decoration: InputDecoration(
+                    hintText: '搜索模型、转发目标、路径...',
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: keywordCtrl.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              keywordCtrl.clear();
+                              setDialogState(() => tempKeyword = '');
+                            },
+                          )
+                        : null,
+                  ),
+                  style: const TextStyle(fontSize: 14),
+                  onChanged: (v) => setDialogState(() => tempKeyword = v),
+                ),
+                if (models.isNotEmpty || forwards.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      if (models.isNotEmpty)
+                        Expanded(
+                          child: _FilterDropdown(
+                            label: '模型',
+                            value: tempModelFilter,
+                            items: models,
+                            onChanged: (v) =>
+                                setDialogState(() => tempModelFilter = v),
+                            onClear: tempModelFilter != null
+                                ? () => setDialogState(() => tempModelFilter = null)
+                                : null,
+                          ),
+                        ),
+                      if (models.isNotEmpty && forwards.isNotEmpty)
+                        const SizedBox(width: 8),
+                      if (forwards.isNotEmpty)
+                        Expanded(
+                          child: _FilterDropdown(
+                            label: '转发目标',
+                            value: tempForwardToFilter,
+                            items: forwards,
+                            onChanged: (v) =>
+                                setDialogState(() => tempForwardToFilter = v),
+                            onClear: tempForwardToFilter != null
+                                ? () => setDialogState(() => tempForwardToFilter = null)
+                                : null,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        ref.read(logOutputProvider.notifier).setFilter(const FileLogFilter());
+                        Navigator.of(ctx).pop();
+                      },
+                      child: const Text('清除'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: () {
+                        ref.read(logOutputProvider.notifier).setFilter(FileLogFilter(
+                          keyword: tempKeyword,
+                          modelFilter: tempModelFilter,
+                          forwardToFilter: tempForwardToFilter,
+                        ));
+                        Navigator.of(ctx).pop();
+                      },
+                      child: const Text('应用'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    // 延迟 dispose，确保 dialog 动画和 widget 树已完全销毁
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      keywordCtrl.dispose();
+    });
   }
 
   Widget _buildBody(BuildContext context, FileLogState state) {
@@ -101,21 +241,100 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
       );
     }
 
+    final filtered = state.filteredEntries;
     final displayEntries =
-        _reversed ? state.entries.reversed.toList() : state.entries;
+        _reversed ? filtered.reversed.toList() : filtered;
 
     return Column(
       children: [
-        LogSummaryBar(entries: state.entries, filePath: state.filePath),
-        const Divider(height: 1),
-        Expanded(
-          child: ListView.builder(
-            itemCount: displayEntries.length,
-            itemBuilder: (context, index) =>
-                FileLogItem(entry: displayEntries[index]),
-          ),
+        LogSummaryBar(
+          entries: state.entries,
+          filePath: state.filePath,
+          filteredEntries: state.filter.isEmpty ? null : filtered,
         ),
+        const Divider(height: 1),
+        if (displayEntries.isEmpty)
+          const Expanded(
+            child: Center(
+              child: Text('没有匹配的日志记录',
+                  style: TextStyle(color: Colors.grey, fontSize: 14)),
+            ),
+          )
+        else
+          Expanded(
+            child: ListView.builder(
+              itemCount: displayEntries.length,
+              itemBuilder: (context, index) =>
+                  FileLogItem(entry: displayEntries[index]),
+            ),
+          ),
       ],
+    );
+  }
+}
+
+/// 过滤条件下拉选择器
+class _FilterDropdown extends StatelessWidget {
+  final String label;
+  final String? value;
+  final List<String> items;
+  final ValueChanged<String?> onChanged;
+  final VoidCallback? onClear;
+
+  const _FilterDropdown({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Text('$label: ',
+              style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String?>(
+                value: value,
+                isExpanded: true,
+                isDense: true,
+                hint: const Text('全部', style: TextStyle(fontSize: 12)),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurface),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('全部', style: TextStyle(fontSize: 12)),
+                  ),
+                  ...items.map((item) => DropdownMenuItem<String?>(
+                        value: item,
+                        child: Text(item,
+                            style: const TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis),
+                      )),
+                ],
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+          if (value != null)
+            GestureDetector(
+              onTap: onClear,
+              child:
+                  const Icon(Icons.clear, size: 16, color: Colors.grey),
+            ),
+        ],
+      ),
     );
   }
 }
