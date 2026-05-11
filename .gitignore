@@ -54,3 +54,5 @@ llm_proxy_requests.log
 # FVM Version Cache
 .fvm/
 .vscode/
+
+log_output.json

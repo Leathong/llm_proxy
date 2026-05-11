@@ -138,6 +138,7 @@ class FileLogToolUse {
       name: json['name'] as String? ?? '',
       id: json['id'] as String? ?? '',
       inputPreview: json['input_preview'] as String?,
+      inputFull: json['input_full'] as String?,
     );
   }
 }
@@ -159,6 +160,7 @@ class FileLogToolResult {
     return FileLogToolResult(
       toolUseId: json['tool_use_id'] as String? ?? '',
       contentPreview: json['content_preview'] as String?,
+      contentFull: json['content_full'] as String?,
     );
   }
 }
@@ -216,19 +218,30 @@ class FileLogUsage {
   });
 
   factory FileLogUsage.fromJson(Map<String, dynamic> json) {
+    // 提取 OpenAI prompt_tokens_details 中的缓存信息
+    final details =
+        json['prompt_tokens_details'] as Map<String, dynamic>? ?? {};
+
     return FileLogUsage(
-      cacheCreationInputTokens: json['cache_creation_input_tokens'] as int?,
-      cacheReadInputTokens: json['cache_read_input_tokens'] as int?,
-      inputTokens: json['input_tokens'] as int?,
-      outputTokens: json['output_tokens'] as int?,
+      // Anthropic 格式缓存字段 + OpenAI 格式兼容
+      cacheCreationInputTokens:
+          json['cache_creation_input_tokens'] as int?,
+      cacheReadInputTokens:
+          json['cache_read_input_tokens'] as int? ??
+          json['prompt_cache_hit_tokens'] as int? ??
+          details['cached_tokens'] as int?,
+      // 输入 token：兼容 Anthropic(input_tokens) 和 OpenAI(prompt_tokens)
+      inputTokens:
+          json['input_tokens'] as int? ?? json['prompt_tokens'] as int?,
+      // 输出 token：兼容 Anthropic(output_tokens) 和 OpenAI(completion_tokens)
+      outputTokens:
+          json['output_tokens'] as int? ?? json['completion_tokens'] as int?,
       serviceTier: json['service_tier'] as String?,
     );
   }
 
-  int get totalInputTokens =>
-      (inputTokens ?? 0) +
-      (cacheCreationInputTokens ?? 0) +
-      (cacheReadInputTokens ?? 0);
+  // input_tokens/prompt_tokens 已包含缓存 token，缓存字段是其子计数
+  int get totalInputTokens => inputTokens ?? 0;
 }
 
 /// 响应内容块（text / tool_use）

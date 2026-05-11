@@ -229,16 +229,23 @@ class LogFileParser {
     return (_truncate(full, 500), full);
   }
 
-  /// 提取工具定义列表（仅保留名称和描述摘要）
+  /// 提取工具定义列表（兼容 Anthropic 和 OpenAI 两种格式）
   static List<FileLogToolDef>? _extractToolDefs(dynamic tools) {
     if (tools is! List || tools.isEmpty) return null;
 
     final result = <FileLogToolDef>[];
     for (final tool in tools) {
       if (tool is! Map<String, dynamic>) continue;
-      final name = tool['name'] as String? ?? '';
-      final desc = tool['description'] as String?;
-      final inputSchema = tool['input_schema'] as Map<String, dynamic>?;
+
+      // OpenAI 格式：{ "type": "function", "function": { "name", "description", "parameters" } }
+      // Anthropic 格式：{ "name", "description", "input_schema" }
+      final funcObj = tool['function'] as Map<String, dynamic>?;
+      final source = funcObj ?? tool;
+
+      final name = source['name'] as String? ?? '';
+      final desc = source['description'] as String?;
+      final inputSchema = (source['input_schema'] ?? source['parameters'])
+          as Map<String, dynamic>?;
       result.add(FileLogToolDef(
         name: name,
         descriptionPreview: desc != null ? _truncate(desc, 100) : null,
@@ -282,7 +289,7 @@ class LogFileParser {
               name: item['name'] as String? ?? '',
               id: item['id'] as String? ?? '',
               inputPreview: inputTruncated,
-              inputFull: inputTruncated != inputJson ? inputJson : null,
+              inputFull: inputJson,
             ));
           case 'tool_result':
             final c = item['content'];
@@ -291,8 +298,7 @@ class LogFileParser {
             toolResults.add(FileLogToolResult(
               toolUseId: item['tool_use_id'] as String? ?? '',
               contentPreview: contentTruncated,
-              contentFull:
-                  contentTruncated != contentStr ? contentStr : null,
+              contentFull: contentStr,
             ));
           case 'image':
             textParts.add('[image]');

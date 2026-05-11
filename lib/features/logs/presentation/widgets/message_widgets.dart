@@ -180,18 +180,19 @@ class ToolUseCard extends StatelessWidget {
 
   const ToolUseCard({super.key, required this.toolUse});
 
+  /// inputFull 内容是否比 inputPreview 更长（即发生了截断）
+  bool get _wasTruncated =>
+      toolUse.inputFull != null &&
+      toolUse.inputPreview != null &&
+      toolUse.inputFull!.length > toolUse.inputPreview!.length;
+
   @override
   Widget build(BuildContext context) {
+    // 内容较长时格式化展示，始终可点击查看详情弹窗
+    final displayText = toolUse.inputFull ?? toolUse.inputPreview ?? '{}';
+
     return GestureDetector(
-      onTap: toolUse.inputFull != null
-          ? () => _showDetailDialog(
-                context,
-                title: toolUse.name,
-                icon: Icons.build,
-                iconColor: Colors.amber,
-                content: toolUse.inputFull!,
-              )
-          : null,
+      onTap: () => _showToolUseDetail(context),
       child: Container(
         margin: const EdgeInsets.only(top: 8),
         padding: const EdgeInsets.all(10),
@@ -216,12 +217,20 @@ class ToolUseCard extends StatelessWidget {
                         const TextStyle(color: Colors.grey, fontSize: 10)),
               ],
             ),
-            if (toolUse.inputPreview != null) ...[
-              const SizedBox(height: 6),
-              SelectableText(toolUse.inputPreview!,
-                  style: const TextStyle(fontSize: 11, color: Colors.grey)),
-            ],
-            if (toolUse.inputFull != null) ...[
+            const SizedBox(height: 6),
+            // 限制最大高度，超出时省略
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 130),
+              child: SelectableText(
+                displayText,
+                style: const TextStyle(
+                    fontSize: 10,
+                    fontFamily: 'monospace',
+                    height: 1.3,
+                    color: Colors.black87),
+              ),
+            ),
+            if (_wasTruncated) ...[
               const SizedBox(height: 4),
               Text('点击查看完整内容',
                   style: TextStyle(
@@ -231,6 +240,16 @@ class ToolUseCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  void _showToolUseDetail(BuildContext context) {
+    _showDetailDialog(
+      context,
+      title: toolUse.name,
+      icon: Icons.build,
+      iconColor: Colors.amber,
+      content: toolUse.inputFull ?? toolUse.inputPreview ?? '{}',
     );
   }
 }

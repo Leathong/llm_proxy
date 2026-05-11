@@ -19,6 +19,7 @@ class RequestTransformer {
       if (thinkingValue == 'high' || thinkingValue == 'max') {
         bodyJson['thinking'] = {'type': 'enabled'};
         bodyJson['reasoning_effort'] = thinkingValue;
+        bodyJson['extra_body'] = {'enable_thinking': true};
         onLog?.call('从 URL 参数注入 thinking: enabled, reasoning_effort: $thinkingValue');
         return bodyJson;
       }
@@ -27,6 +28,7 @@ class RequestTransformer {
     // 使用规则中的 thinking 配置
     if (rule.thinkingMode.isNotEmpty) {
       bodyJson['thinking'] = {'type': rule.thinkingMode};
+      bodyJson['extra_body'] = {'enable_thinking': rule.thinkingMode == "enabled" ? true : false};
       onLog?.call('注入 thinking: ${rule.thinkingMode}');
     }
     if (rule.thinkingMode == 'enabled' && rule.reasoningEffort.isNotEmpty) {
