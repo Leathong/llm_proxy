@@ -77,7 +77,7 @@ class LogSummaryBar extends StatelessWidget {
             label: 'P90',
             value: '${p90}ms',
             color: Colors.orange,
-            onTap: durations.isNotEmpty ? () => _showDurationStats(context, durations, ttfbDurations) : null,
+            onTap: durations.isNotEmpty ? () => _showDurationStats(context, durations) : null,
           ),
           const SizedBox(width: 8),
           if (ttfbDurations.isNotEmpty) ...[
@@ -85,6 +85,7 @@ class LogSummaryBar extends StatelessWidget {
               label: 'TTFB',
               value: '${ttfbP90}ms',
               color: Colors.teal,
+              onTap: () => _showTtfbStats(context, ttfbDurations),
             ),
             const SizedBox(width: 8),
           ],
@@ -98,88 +99,100 @@ class LogSummaryBar extends StatelessWidget {
     );
   }
 
-  /// 弹出耗时详细统计面板
-  void _showDurationStats(BuildContext context, List<int> sorted, List<int> ttfbSorted) {
+  /// 弹出总耗时详细统计面板
+  void _showDurationStats(BuildContext context, List<int> sorted) {
     final max = sorted.last;
     final p90 = _percentile(sorted, 90);
     final p70 = _percentile(sorted, 70);
     final p50 = _percentile(sorted, 50);
     final avg = sorted.fold<int>(0, (s, v) => s + v) ~/ sorted.length;
 
-    // TTFB 统计
-    final ttfbMax = ttfbSorted.isNotEmpty ? ttfbSorted.last : 0;
-    final ttfbP90 = _percentile(ttfbSorted, 90);
-    final ttfbP50 = _percentile(ttfbSorted, 50);
-    final ttfbAvg = ttfbSorted.isNotEmpty ? ttfbSorted.fold<int>(0, (s, v) => s + v) ~/ ttfbSorted.length : 0;
+    showDialog(
+      context: context,
+      builder: (ctx) => _buildStatsDialog(
+        ctx,
+        title: '总耗时统计',
+        iconColor: Colors.orange,
+        sorted: sorted,
+        max: max,
+        p90: p90,
+        p70: p70,
+        p50: p50,
+        avg: avg,
+      ),
+    );
+  }
+
+  /// 弹出 TTFB 首字节耗时统计面板
+  void _showTtfbStats(BuildContext context, List<int> sorted) {
+    final max = sorted.last;
+    final p90 = _percentile(sorted, 90);
+    final p70 = _percentile(sorted, 70);
+    final p50 = _percentile(sorted, 50);
+    final avg = sorted.fold<int>(0, (s, v) => s + v) ~/ sorted.length;
 
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        insetPadding: const EdgeInsets.symmetric(horizontal: 60, vertical: 24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.timer_outlined, size: 20, color: Colors.orange),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text('耗时统计', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => Navigator.of(context).pop(),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  '总耗时',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.orange),
-                ),
-                const SizedBox(height: 4),
-                _DurationRow(label: '最慢', value: max, ratio: 1.0, barColor: Colors.red),
-                _DurationRow(label: 'P90', value: p90, ratio: max > 0 ? p90 / max : 0, barColor: Colors.orange),
-                _DurationRow(label: 'P70', value: p70, ratio: max > 0 ? p70 / max : 0, barColor: Colors.amber),
-                _DurationRow(label: 'P50', value: p50, ratio: max > 0 ? p50 / max : 0, barColor: Colors.teal),
-                _DurationRow(label: '平均', value: avg, ratio: max > 0 ? avg / max : 0, barColor: Colors.blue),
-                if (ttfbSorted.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  const Text(
-                    '首字节 (TTFB)',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.teal),
+      builder: (ctx) => _buildStatsDialog(
+        ctx,
+        title: '首字节耗时 (TTFB)',
+        iconColor: Colors.teal,
+        sorted: sorted,
+        max: max,
+        p90: p90,
+        p70: p70,
+        p50: p50,
+        avg: avg,
+      ),
+    );
+  }
+
+  /// 构建统计弹窗的通用 Widget
+  Widget _buildStatsDialog(
+    BuildContext dialogContext, {
+    required String title,
+    required Color iconColor,
+    required List<int> sorted,
+    required int max,
+    required int p90,
+    int? p70,
+    required int p50,
+    required int avg,
+  }) {
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 60, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.timer_outlined, size: 20, color: iconColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                   ),
-                  const SizedBox(height: 4),
-                  _DurationRow(label: '最慢', value: ttfbMax, ratio: 1.0, barColor: Colors.red),
-                  _DurationRow(
-                    label: 'P90',
-                    value: ttfbP90,
-                    ratio: ttfbMax > 0 ? ttfbP90 / ttfbMax : 0,
-                    barColor: Colors.orange,
-                  ),
-                  _DurationRow(
-                    label: 'P50',
-                    value: ttfbP50,
-                    ratio: ttfbMax > 0 ? ttfbP50 / ttfbMax : 0,
-                    barColor: Colors.teal,
-                  ),
-                  _DurationRow(
-                    label: '平均',
-                    value: ttfbAvg,
-                    ratio: ttfbMax > 0 ? ttfbAvg / ttfbMax : 0,
-                    barColor: Colors.blue,
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    visualDensity: VisualDensity.compact,
                   ),
                 ],
-                const SizedBox(height: 8),
-                Text('共 ${sorted.length} 条请求', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+              _DurationRow(label: '最慢', value: max, ratio: 1.0, barColor: Colors.red),
+              _DurationRow(label: 'P90', value: p90, ratio: max > 0 ? p90 / max : 0, barColor: Colors.orange),
+              if (p70 != null)
+                _DurationRow(label: 'P70', value: p70, ratio: max > 0 ? p70 / max : 0, barColor: Colors.amber),
+              _DurationRow(label: 'P50', value: p50, ratio: max > 0 ? p50 / max : 0, barColor: Colors.teal),
+              _DurationRow(label: '平均', value: avg, ratio: max > 0 ? avg / max : 0, barColor: Colors.blue),
+              const SizedBox(height: 8),
+              Text('共 ${sorted.length} 条请求', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+            ],
           ),
         ),
       ),
