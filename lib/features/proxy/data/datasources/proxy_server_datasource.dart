@@ -43,8 +43,8 @@ class ProxyServerDataSource {
     );
   }
 
-  void setLogFilePath(String path) {
-    _logWriter.setLogFilePath(path);
+  void setLogFileDir(String dir) {
+    _logWriter.setLogFileDir(dir);
   }
 
   Future<void> start({int port = 8080, String? certPath, String? keyPath}) async {

@@ -15,8 +15,8 @@ class SettingsLocalDataSource {
     return const ['localhost', 'api.openai.com'];
   }
 
-  String? loadLogFilePath() {
-    final path = _prefs.getString('logFilePath');
+  String? loadLogFileDir() {
+    final path = _prefs.getString('logFileDir');
     return (path != null && path.isNotEmpty) ? path : null;
   }
 
@@ -29,5 +29,5 @@ class SettingsLocalDataSource {
 
   Future<void> saveCertDomains(List<String> domains) =>
       _prefs.setStringList('certDomains', domains);
-  Future<void> saveLogFilePath(String path) => _prefs.setString('logFilePath', path);
+  Future<void> saveLogFileDir(String path) => _prefs.setString('logFileDir', path);
 }

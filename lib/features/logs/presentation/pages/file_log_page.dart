@@ -34,7 +34,7 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
               icon: const Icon(Icons.refresh),
               tooltip: '重新加载',
               onPressed: () =>
-                  ref.read(logOutputProvider.notifier).loadFile(logState.filePath!),
+                  ref.read(logOutputProvider.notifier).loadDirectory(logState.filePath!),
             ),
           // Filter 按钮 — 有过滤时高亮
           if (logState.entries.isNotEmpty)
@@ -67,13 +67,11 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
   }
 
   Future<void> _pickAndLoadFile(WidgetRef ref) async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['log', 'json'],
-      dialogTitle: '选择日志文件（.log 或 .json）',
+    final result = await FilePicker.getDirectoryPath(
+      dialogTitle: '选择日志目录',
     );
-    if (result != null && result.files.single.path != null) {
-      ref.read(logOutputProvider.notifier).loadFile(result.files.single.path!);
+    if (result != null) {
+      ref.read(logOutputProvider.notifier).loadDirectory(result);
     }
   }
 

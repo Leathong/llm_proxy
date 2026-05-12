@@ -2,14 +2,16 @@
 """
 解析 llm_proxy 请求日志，生成结构化 JSON 数据。
 支持 Anthropic 和 OpenAI 的 SSE 流式响应拼接。
+支持传入单个 .log 文件或日志目录（遍历所有 .log 文件）。
 
-用法: python parse_logs.py <日志文件路径> [-o 输出文件路径]
+用法: python parse_logs.py <日志文件或目录路径> [-o 输出文件路径]
 """
 
 import re
 import json
 import sys
 import argparse
+import os
 from datetime import datetime
 
 
@@ -515,13 +517,29 @@ def parse_log_file(filepath: str) -> list[dict]:
 
 def main():
     parser = argparse.ArgumentParser(description='解析 llm_proxy 请求日志')
-    parser.add_argument('logfile', help='日志文件路径')
+    parser.add_argument('logfile', help='日志文件路径或日志目录路径')
     parser.add_argument('-o', '--output', help='输出 JSON 文件路径（默认输出到 stdout）')
     parser.add_argument('--pretty', action='store_true', default=True, help='格式化 JSON 输出')
     parser.add_argument('--summary', action='store_true', help='只输出摘要信息')
     args = parser.parse_args()
 
-    records = parse_log_file(args.logfile)
+    input_path = args.logfile
+
+    if os.path.isdir(input_path):
+        # 目录模式：遍历所有 .log 文件
+        all_records = []
+        for fname in sorted(os.listdir(input_path)):
+            if fname.endswith('.log'):
+                fpath = os.path.join(input_path, fname)
+                records = parse_log_file(fpath)
+                # 重新编号 index
+                offset = len(all_records)
+                for r in records:
+                    r['index'] = offset + r.get('index', 0)
+                all_records.extend(records)
+        records = all_records
+    else:
+        records = parse_log_file(input_path)
 
     if args.summary:
         # 摘要模式：只输出关键信息

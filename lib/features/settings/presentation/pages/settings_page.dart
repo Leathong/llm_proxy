@@ -13,9 +13,7 @@ Future<String?> _pickDirectory() async {
     ]);
     if (result.exitCode == 0) {
       final path = (result.stdout as String).trim();
-      if (path.isNotEmpty) {
-        return '${path}llm_proxy_requests.log';
-      }
+      if (path.isNotEmpty) return path;
     }
   } catch (_) {}
   return null;
@@ -247,40 +245,40 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             const SizedBox(height: 20),
             Row(
               children: [
-                const Text('请求日志文件: ', style: TextStyle(fontSize: 16)),
+                const Text('请求日志目录: ', style: TextStyle(fontSize: 16)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
-                    controller: TextEditingController(text: settings.logFilePath)
-                      ..selection = TextSelection.collapsed(offset: settings.logFilePath.length),
+                    controller: TextEditingController(text: settings.logFileDir)
+                      ..selection = TextSelection.collapsed(offset: settings.logFileDir.length),
                     decoration: InputDecoration(
                       hintText: '留空则不记录请求日志',
                       border: const OutlineInputBorder(),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.folder_open, size: 20),
-                        tooltip: '选择日志文件路径',
+                        tooltip: '选择日志保存目录',
                         onPressed: () async {
                           final result = await _pickDirectory();
                           if (result != null && context.mounted) {
-                            ref.read(settingsProvider.notifier).setLogFilePath(result);
+                            ref.read(settingsProvider.notifier).setLogFileDir(result);
                           }
                         },
                       ),
                     ),
-                    onChanged: (val) => ref.read(settingsProvider.notifier).setLogFilePath(val),
+                    onChanged: (val) => ref.read(settingsProvider.notifier).setLogFileDir(val),
                   ),
                 ),
               ],
             ),
-            if (settings.logFilePath.isNotEmpty)
+            if (settings.logFileDir.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8, left: 110),
                 child: Row(
                   children: [
                     Expanded(
                       child: Text(
-                        '日志将追加写入: ${settings.logFilePath}',
+                        '日志将按模型分文件写入: ${settings.logFileDir}',
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ),
@@ -291,7 +289,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           context: context,
                           builder: (context) => AlertDialog(
                             title: const Text('确认清空'),
-                            content: const Text('确定要清空日志文件内容吗？此操作不可撤销。'),
+                            content: const Text('确定要清空日志目录下所有 .log 文件吗？此操作不可撤销。'),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.of(context).pop(false),
@@ -306,9 +304,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         );
                         if (confirmed == true) {
                           try {
-                            final file = File(settings.logFilePath);
-                            if (await file.exists()) {
-                              await file.writeAsString('');
+                            final dir = Directory(settings.logFileDir);
+                            if (await dir.exists()) {
+                              await for (final entity in dir.list()) {
+                                if (entity is File && entity.path.endsWith('.log')) {
+                                  await entity.delete();
+                                }
+                              }
                             }
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(

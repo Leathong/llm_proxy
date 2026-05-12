@@ -69,7 +69,7 @@ class ProxyNotifier extends Notifier<ProxyState> {
           certPath: settings.certPath,
           keyPath: settings.keyPath,
         );
-        dataSource.setLogFilePath(settings.logFilePath);
+        dataSource.setLogFileDir(settings.logFileDir);
         state = state.copyWith(isRunning: true, isLoading: false);
       } catch (e) {
         state = state.copyWith(isRunning: false, isLoading: false, error: e.toString());

@@ -3,13 +3,13 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 /// 代理请求/响应日志写入器。
-/// 将每个请求和对应的响应内容写入指定的日志文件。
+/// 按模型名 + endpoint ID 分文件写入日志目录。
 class LogFileWriter {
-  String? _logFilePath;
+  String? _logFileDir;
 
-  /// 更新日志文件路径（空字符串或 null 表示不写入文件）
-  void setLogFilePath(String path) {
-    _logFilePath = path.isEmpty ? null : path;
+  /// 更新日志目录路径（空字符串或 null 表示不写入文件）
+  void setLogFileDir(String dir) {
+    _logFileDir = dir.isEmpty ? null : dir;
   }
 
   /// 写入一条完整的请求-响应日志
@@ -25,11 +25,13 @@ class LogFileWriter {
     String? model,
     int? requestDurationMs,
     int? firstByteMs,
+    int? endpointId,
   }) async {
-    if (_logFilePath == null) return;
+    if (_logFileDir == null) return;
 
     try {
-      final file = File(_logFilePath!);
+      final filePath = _buildFilePath(model, endpointId);
+      final file = File(filePath);
       await file.parent.create(recursive: true);
 
       final buf = StringBuffer();
@@ -62,6 +64,20 @@ class LogFileWriter {
     } catch (e) {
       developer.log('[LogFileWriter] 写入日志文件失败: $e');
     }
+  }
+
+  /// 根据 model 和 endpointId 生成文件路径
+  String _buildFilePath(String? model, int? endpointId) {
+    final safeModel = _safeFileName(model ?? '_models');
+    final epId = endpointId?.toString() ?? '_unknown';
+    return '$_logFileDir${safeModel}_$epId.log';
+  }
+
+  /// 文件名安全处理：替换非法字符，截断过长名称
+  String _safeFileName(String name) {
+    var safe = name.replaceAll(RegExp(r'[\/\\:*?"<>|]'), '_');
+    if (safe.length > 100) safe = safe.substring(0, 100);
+    return safe;
   }
 
   String _formatTime(DateTime dt) {

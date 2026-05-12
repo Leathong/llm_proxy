@@ -115,10 +115,8 @@ class FileLogNotifier extends Notifier<FileLogState> {
       final List<FileLogEntry> entries;
 
       if (path.endsWith('.log')) {
-        // .log 文本文件：使用内置解析器（Isolate 中执行）
         entries = await LogFileParser.parseFile(path);
       } else {
-        // .json 文件：直接解析
         final content = await file.readAsString();
         final list = jsonDecode(content) as List<dynamic>;
         entries = [
@@ -133,6 +131,53 @@ class FileLogNotifier extends Notifier<FileLogState> {
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '解析失败: $e');
+    }
+  }
+
+  /// 加载日志目录下所有 .log 文件，合并解析
+  Future<void> loadDirectory(String dir) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final directory = Directory(dir);
+      if (!await directory.exists()) {
+        state = state.copyWith(isLoading: false, error: '目录不存在: $dir');
+        return;
+      }
+
+      final allEntries = <FileLogEntry>[];
+      var offset = 0;
+
+      await for (final entity in directory.list()) {
+        if (entity is File && entity.path.endsWith('.log')) {
+          try {
+            final entries = await LogFileParser.parseFile(entity.path);
+            for (final e in entries) {
+              allEntries.add(FileLogEntry(
+                timestamp: e.timestamp,
+                method: e.method,
+                path: e.path,
+                model: e.model,
+                forwardTo: e.forwardTo,
+                durationMs: e.durationMs,
+                firstByteMs: e.firstByteMs,
+                statusCode: e.statusCode,
+                request: e.request,
+                response: e.response,
+                index: offset++,
+              ));
+            }
+          } catch (_) {
+            // 单个文件解析失败不影响其他文件
+          }
+        }
+      }
+
+      state = FileLogState(
+        entries: allEntries,
+        filePath: dir,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '加载目录失败: $e');
     }
   }
 

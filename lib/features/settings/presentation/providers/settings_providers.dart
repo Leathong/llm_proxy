@@ -47,8 +47,8 @@ class SettingsNotifier extends Notifier<AppSettings> {
     ref.invalidateSelf();
   }
 
-  Future<void> setLogFilePath(String path) async {
-    await ref.read(settingsRepositoryProvider).setLogFilePath(path);
+  Future<void> setLogFileDir(String path) async {
+    await ref.read(settingsRepositoryProvider).setLogFileDir(path);
     ref.invalidateSelf();
   }
 }

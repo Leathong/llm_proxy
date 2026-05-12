@@ -237,6 +237,7 @@ class RequestRouter {
           model: requestedModelId, targetEndpoint: targetUrl,
           requestDurationMs: DateTime.now().difference(startTime).inMilliseconds,
           firstByteMs: result.firstByteMs,
+          endpointId: selectedEndpoint.id,
         );
         return;
       }
@@ -257,6 +258,7 @@ class RequestRouter {
         model: requestedModelId, targetEndpoint: targetUrl,
         requestDurationMs: DateTime.now().difference(startTime).inMilliseconds,
         firstByteMs: result.firstByteMs,
+        endpointId: selectedEndpoint.id,
       );
     } catch (e) {
       logger.log('处理请求出错: $e');

@@ -6,5 +6,5 @@ abstract class SettingsRepository {
   Future<void> setEnableSystemProxy(bool enable);
   Future<void> setCertPaths(String certPath, String keyPath);
   Future<void> setCertDomains(List<String> domains);
-  Future<void> setLogFilePath(String path);
+  Future<void> setLogFileDir(String path);
 }

@@ -4,7 +4,7 @@ class AppSettings {
   final String? certPath;
   final String? keyPath;
   final List<String> certDomains;
-  final String logFilePath;
+  final String logFileDir;
 
   const AppSettings({
     this.proxyPort = 8080,
@@ -12,7 +12,7 @@ class AppSettings {
     this.certPath,
     this.keyPath,
     this.certDomains = const ['localhost', 'api.openai.com'],
-    this.logFilePath = '',
+    this.logFileDir = '',
   });
 
   AppSettings copyWith({
@@ -21,7 +21,7 @@ class AppSettings {
     String? certPath,
     String? keyPath,
     List<String>? certDomains,
-    String? logFilePath,
+    String? logFileDir,
   }) {
     return AppSettings(
       proxyPort: proxyPort ?? this.proxyPort,
@@ -29,7 +29,7 @@ class AppSettings {
       certPath: certPath ?? this.certPath,
       keyPath: keyPath ?? this.keyPath,
       certDomains: certDomains ?? this.certDomains,
-      logFilePath: logFilePath ?? this.logFilePath,
+      logFileDir: logFileDir ?? this.logFileDir,
     );
   }
 }

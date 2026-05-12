@@ -13,7 +13,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
           certPath: _dataSource.loadCertPath(),
           keyPath: _dataSource.loadKeyPath(),
           certDomains: _dataSource.loadCertDomains(),
-          logFilePath: _dataSource.loadLogFilePath() ?? '',
+          logFileDir: _dataSource.loadLogFileDir() ?? '',
         );
 
   @override
@@ -44,8 +44,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
   }
 
   @override
-  Future<void> setLogFilePath(String path) async {
-    _cache = _cache.copyWith(logFilePath: path);
-    await _dataSource.saveLogFilePath(path);
+  Future<void> setLogFileDir(String path) async {
+    _cache = _cache.copyWith(logFileDir: path);
+    await _dataSource.saveLogFileDir(path);
   }
 }
