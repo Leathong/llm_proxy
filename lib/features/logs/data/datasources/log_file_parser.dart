@@ -17,6 +17,7 @@ class LogFileParser {
   static final _modelRe = RegExp(r'^\[Model\]\s+(.+)$');
   static final _forwardToRe = RegExp(r'^\[Forward To\]\s+(.+)$');
   static final _durationRe = RegExp(r'^\[Duration\]\s+(\d+)ms$');
+  static final _firstByteRe = RegExp(r'^\[First Byte\]\s+(\d+)ms$');
   static final _statusRe = RegExp(r'^\[Status\]\s+(\d+)$');
 
   /// 解析 .log 文件，在 Isolate 中执行以避免阻塞 UI
@@ -90,6 +91,7 @@ class LogFileParser {
       model: meta['model'] as String?,
       forwardTo: meta['forward_to'] as String?,
       durationMs: meta['duration_ms'] as int?,
+      firstByteMs: meta['first_byte_ms'] as int?,
       statusCode: meta['status_code'] as int?,
       request: reqRaw.isNotEmpty ? _parseRequestBody(reqRaw) : null,
       response: respRaw.isNotEmpty
@@ -124,6 +126,8 @@ class LogFileParser {
         meta['forward_to'] = m!.group(1)!;
       } else if ((m = _durationRe.firstMatch(line)) != null) {
         meta['duration_ms'] = int.parse(m!.group(1)!);
+      } else if ((m = _firstByteRe.firstMatch(line)) != null) {
+        meta['first_byte_ms'] = int.parse(m!.group(1)!);
       } else if ((m = _statusRe.firstMatch(line)) != null) {
         meta['status_code'] = int.parse(m!.group(1)!);
       }

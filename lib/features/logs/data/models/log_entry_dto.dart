@@ -38,6 +38,7 @@ class LogEntryDTO {
   final int? statusCode;
   final String? error;
   final int requestDurationMs;
+  final int? firstByteDurationMs;
   @JsonKey(fromJson: _logStatusFromJson, toJson: _logStatusToJson)
   final LogStatus status;
 
@@ -51,6 +52,7 @@ class LogEntryDTO {
     this.statusCode,
     this.error,
     this.requestDurationMs = 0,
+    this.firstByteDurationMs,
     this.status = LogStatus.completed,
   });
 
@@ -67,6 +69,7 @@ class LogEntryDTO {
         statusCode: statusCode,
         error: error,
         requestDurationMs: requestDurationMs,
+        firstByteDurationMs: firstByteDurationMs,
         status: status,
       );
 
@@ -80,6 +83,7 @@ class LogEntryDTO {
         statusCode: entity.statusCode,
         error: entity.error,
         requestDurationMs: entity.requestDurationMs,
+        firstByteDurationMs: entity.firstByteDurationMs,
         status: entity.status,
       );
 }

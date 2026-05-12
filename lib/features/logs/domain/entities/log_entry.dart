@@ -14,6 +14,8 @@ class LogEntry {
   final int? statusCode;
   final String? error;
   final int requestDurationMs;
+  /// 首字节耗时（毫秒），仅流式请求有值
+  final int? firstByteDurationMs;
   final LogStatus status;
 
   const LogEntry({
@@ -26,6 +28,7 @@ class LogEntry {
     this.statusCode,
     this.error,
     this.requestDurationMs = 0,
+    this.firstByteDurationMs,
     this.status = LogStatus.completed,
   });
 
@@ -39,6 +42,7 @@ class LogEntry {
     int? statusCode,
     String? error,
     int? requestDurationMs,
+    int? firstByteDurationMs,
     LogStatus? status,
   }) {
     return LogEntry(
@@ -51,6 +55,7 @@ class LogEntry {
       statusCode: statusCode ?? this.statusCode,
       error: error ?? this.error,
       requestDurationMs: requestDurationMs ?? this.requestDurationMs,
+      firstByteDurationMs: firstByteDurationMs ?? this.firstByteDurationMs,
       status: status ?? this.status,
     );
   }

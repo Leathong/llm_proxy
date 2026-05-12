@@ -6,6 +6,8 @@ class FileLogEntry {
   final String? model;
   final String? forwardTo;
   final int? durationMs;
+  /// 首字节耗时（毫秒）
+  final int? firstByteMs;
   final int? statusCode;
   final FileLogRequest? request;
   final FileLogResponse? response;
@@ -18,6 +20,7 @@ class FileLogEntry {
     this.model,
     this.forwardTo,
     this.durationMs,
+    this.firstByteMs,
     this.statusCode,
     this.request,
     this.response,
@@ -32,6 +35,7 @@ class FileLogEntry {
       model: json['model'] as String?,
       forwardTo: json['forward_to'] as String?,
       durationMs: json['duration_ms'] as int?,
+      firstByteMs: json['first_byte_ms'] as int?,
       statusCode: json['status_code'] as int?,
       request: json['request'] != null
           ? FileLogRequest.fromJson(json['request'] as Map<String, dynamic>)

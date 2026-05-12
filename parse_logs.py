@@ -24,6 +24,7 @@ META_PATTERNS = {
     'model':      re.compile(r'^\[Model\]\s+(.+)$'),
     'forward_to': re.compile(r'^\[Forward To\]\s+(.+)$'),
     'duration':   re.compile(r'^\[Duration\]\s+(\d+)ms$'),
+    'first_byte': re.compile(r'^\[First Byte\]\s+(\d+)ms$'),
     'status':     re.compile(r'^\[Status\]\s+(\d+)$'),
 }
 
@@ -79,6 +80,8 @@ def parse_metadata(lines: list[str]) -> tuple[dict, int]:
                     meta['path'] = m.group(2)
                 elif key == 'duration':
                     meta['duration_ms'] = int(m.group(1))
+                elif key == 'first_byte':
+                    meta['first_byte_ms'] = int(m.group(1))
                 elif key == 'status':
                     meta['status_code'] = int(m.group(1))
                 else:
@@ -531,6 +534,7 @@ def main():
                 'path': r.get('path'),
                 'status_code': r.get('status_code'),
                 'duration_ms': r.get('duration_ms'),
+                'first_byte_ms': r.get('first_byte_ms'),
             }
             resp = r.get('response', {})
             resp_type = resp.get('type', '')

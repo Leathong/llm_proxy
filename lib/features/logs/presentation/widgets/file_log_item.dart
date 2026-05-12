@@ -125,8 +125,18 @@ class _FileLogItemState extends State<FileLogItem> {
                   overflow: TextOverflow.ellipsis),
             ),
             if (entry.durationMs != null)
-              Text('${entry.durationMs}ms',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('${entry.durationMs}ms',
+                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  if (entry.firstByteMs != null) ...[
+                    const SizedBox(width: 4),
+                    Text('TTFB ${entry.firstByteMs}ms',
+                        style: const TextStyle(color: Colors.blueGrey, fontSize: 11)),
+                  ],
+                ],
+              ),
           ],
         ),
         // 副标题：时间 + 模型 + 消息数

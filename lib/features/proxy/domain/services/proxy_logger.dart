@@ -51,6 +51,7 @@ class ProxyLogger {
     String? targetEndpoint,
     int? statusCode,
     String? error,
+    int? firstByteDurationMs,
     LogStatus status = LogStatus.completed,
   }) {
     onLogEntryUpdate?.call(
@@ -64,6 +65,7 @@ class ProxyLogger {
         statusCode: statusCode,
         error: error,
         requestDurationMs: DateTime.now().difference(time).inMilliseconds,
+        firstByteDurationMs: firstByteDurationMs,
         status: status,
       ),
     );

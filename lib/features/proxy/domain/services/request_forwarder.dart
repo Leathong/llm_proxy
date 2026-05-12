@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -7,12 +8,15 @@ class ForwardResult {
   final String? responseBody;
   final String? error;
   final bool clientDisconnected;
+  /// 首字节耗时（毫秒），从请求发出到收到第一个响应 chunk 的时间
+  final int? firstByteMs;
 
   const ForwardResult({
     required this.statusCode,
     this.responseBody,
     this.error,
     this.clientDisconnected = false,
+    this.firstByteMs,
   });
 
   bool get isError => statusCode >= 400 || error != null;
@@ -22,6 +26,7 @@ class ForwardResult {
 class RequestForwarder {
   /// 转发请求到目标 URL，返回转发结果
   /// 当客户端断开连接时，会立即取消上游请求以节省资源
+  /// SSE 流式响应会逐块透传给客户端，不再缓冲全部数据
   Future<ForwardResult> forward({
     required HttpRequest clientRequest,
     required String targetUrl,
@@ -66,6 +71,8 @@ class RequestForwarder {
       targetRequest.headers.contentType = ContentType.json;
       targetRequest.add(bodyBytes);
 
+      // 记录请求发出时间（用于 TTFB 计算）
+      final forwardStartTime = DateTime.now();
       final targetResponse = await targetRequest.close();
 
       // 客户端已断开，无需回写
@@ -85,25 +92,35 @@ class RequestForwarder {
         }
       });
 
-      // 读取并回写响应体
-      final responseBytes = await targetResponse.toList();
-      final allBytes = responseBytes.expand((b) => b).toList();
-      final responseBodyStr = utf8.decode(allBytes);
+      // 流式转发：逐块读取上游响应并立即回写给客户端
+      final responseBodyBuf = StringBuffer();
+      int? firstByteMs;
+      await for (final chunk in targetResponse) {
+        if (clientDisconnected) break;
+
+        // 记录首字节耗时
+        firstByteMs ??= DateTime.now().difference(forwardStartTime).inMilliseconds;
+
+        final chunkStr = utf8.decode(chunk, allowMalformed: true);
+        responseBodyBuf.write(chunkStr);
+        clientRequest.response.add(chunk);
+      }
 
       if (clientDisconnected) {
         return ForwardResult(
           statusCode: targetResponse.statusCode,
-          responseBody: responseBodyStr,
+          responseBody: responseBodyBuf.toString(),
           clientDisconnected: true,
+          firstByteMs: firstByteMs,
         );
       }
 
-      clientRequest.response.add(allBytes);
       await clientRequest.response.close();
 
       return ForwardResult(
         statusCode: targetResponse.statusCode,
-        responseBody: responseBodyStr,
+        responseBody: responseBodyBuf.toString(),
+        firstByteMs: firstByteMs,
       );
     } catch (e) {
       // 客户端断开导致的异常，直接返回，不再尝试回写

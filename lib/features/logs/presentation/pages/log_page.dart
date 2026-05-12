@@ -122,8 +122,18 @@ class _LogItem extends StatelessWidget {
             if (log.status == LogStatus.pending)
               _PendingDuration(startTime: log.time)
             else
-              Text('${log.requestDurationMs}ms',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('${log.requestDurationMs}ms',
+                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  if (log.firstByteDurationMs != null) ...[
+                    const SizedBox(width: 4),
+                    Text('TTFB ${log.firstByteDurationMs}ms',
+                        style: const TextStyle(color: Colors.blueGrey, fontSize: 11)),
+                  ],
+                ],
+              ),
           ],
         ),
         subtitle: Padding(

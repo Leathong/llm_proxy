@@ -24,6 +24,7 @@ class LogFileWriter {
     String? targetEndpoint,
     String? model,
     int? requestDurationMs,
+    int? firstByteMs,
   }) async {
     if (_logFilePath == null) return;
 
@@ -39,6 +40,7 @@ class LogFileWriter {
       if (model != null) buf.writeln('[Model] $model');
       if (targetEndpoint != null) buf.writeln('[Forward To] $targetEndpoint');
       if (requestDurationMs != null) buf.writeln('[Duration] ${requestDurationMs}ms');
+      if (firstByteMs != null) buf.writeln('[First Byte] ${firstByteMs}ms');
       buf.writeln('[Status] $statusCode');
 
       if (requestBody != null && requestBody.isNotEmpty) {

@@ -228,6 +228,7 @@ class RequestRouter {
           path: request.uri.path, model: requestedModelId,
           targetEndpoint: targetUrl, statusCode: result.statusCode,
           status: LogStatus.error, error: 'Client disconnected',
+          firstByteDurationMs: result.firstByteMs,
         );
         logWriter.writeLog(
           time: startTime, method: request.method, path: request.uri.path,
@@ -235,6 +236,7 @@ class RequestRouter {
           responseBody: result.responseBody, error: 'Client disconnected',
           model: requestedModelId, targetEndpoint: targetUrl,
           requestDurationMs: DateTime.now().difference(startTime).inMilliseconds,
+          firstByteMs: result.firstByteMs,
         );
         return;
       }
@@ -246,6 +248,7 @@ class RequestRouter {
         targetEndpoint: targetUrl, statusCode: result.statusCode,
         status: result.isError ? LogStatus.error : LogStatus.completed,
         error: result.error,
+        firstByteDurationMs: result.firstByteMs,
       );
       logWriter.writeLog(
         time: startTime, method: request.method, path: request.uri.path,
@@ -253,6 +256,7 @@ class RequestRouter {
         responseBody: result.responseBody, error: result.error,
         model: requestedModelId, targetEndpoint: targetUrl,
         requestDurationMs: DateTime.now().difference(startTime).inMilliseconds,
+        firstByteMs: result.firstByteMs,
       );
     } catch (e) {
       logger.log('处理请求出错: $e');
