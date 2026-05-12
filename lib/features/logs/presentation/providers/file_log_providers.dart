@@ -65,6 +65,7 @@ class FileLogState {
   final String? error;
   final bool isLoading;
   final FileLogFilter filter;       // 当前过滤条件
+  final List<String> loadedFiles;   // 当前已加载的文件路径列表
 
   const FileLogState({
     this.entries = const [],
@@ -72,6 +73,7 @@ class FileLogState {
     this.error,
     this.isLoading = false,
     this.filter = const FileLogFilter(),
+    this.loadedFiles = const [],
   });
 
   FileLogState copyWith({
@@ -80,6 +82,7 @@ class FileLogState {
     String? error,
     bool? isLoading,
     FileLogFilter? filter,
+    List<String>? loadedFiles,
   }) {
     return FileLogState(
       entries: entries ?? this.entries,
@@ -87,6 +90,7 @@ class FileLogState {
       error: error,
       isLoading: isLoading ?? this.isLoading,
       filter: filter ?? this.filter,
+      loadedFiles: loadedFiles ?? this.loadedFiles,
     );
   }
 
@@ -145,6 +149,7 @@ class FileLogNotifier extends Notifier<FileLogState> {
       }
 
       final allEntries = <FileLogEntry>[];
+      final loadedFiles = <String>[];
       var offset = 0;
 
       await for (final entity in directory.list()) {
@@ -166,6 +171,7 @@ class FileLogNotifier extends Notifier<FileLogState> {
                 index: offset++,
               ));
             }
+            loadedFiles.add(entity.path);
           } catch (_) {
             // 单个文件解析失败不影响其他文件
           }
@@ -175,9 +181,60 @@ class FileLogNotifier extends Notifier<FileLogState> {
       state = FileLogState(
         entries: allEntries,
         filePath: dir,
+        loadedFiles: loadedFiles,
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '加载目录失败: $e');
+    }
+  }
+
+  /// 加载指定的文件列表，合并解析
+  Future<void> loadFiles(List<String> filePaths) async {
+    if (filePaths.isEmpty) {
+      state = const FileLogState();
+      return;
+    }
+
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final allEntries = <FileLogEntry>[];
+      var offset = 0;
+
+      for (final path in filePaths) {
+        final file = File(path);
+        if (!await file.exists()) continue;
+        try {
+          final entries = await LogFileParser.parseFile(path);
+          for (final e in entries) {
+            allEntries.add(FileLogEntry(
+              timestamp: e.timestamp,
+              method: e.method,
+              path: e.path,
+              model: e.model,
+              forwardTo: e.forwardTo,
+              durationMs: e.durationMs,
+              firstByteMs: e.firstByteMs,
+              statusCode: e.statusCode,
+              request: e.request,
+              response: e.response,
+              index: offset++,
+            ));
+          }
+        } catch (_) {
+          // 单个文件解析失败不影响其他文件
+        }
+      }
+
+      // 取第一个文件的父目录作为 filePath
+      final dir = Directory(filePaths.first).parent.path;
+
+      state = FileLogState(
+        entries: allEntries,
+        filePath: dir,
+        loadedFiles: filePaths,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '加载文件失败: $e');
     }
   }
 

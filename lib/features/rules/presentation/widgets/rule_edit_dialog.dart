@@ -39,81 +39,47 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
     if (widget.rule != null && widget.rule!.endpoints.isNotEmpty) {
       _endpoints = widget.rule!.endpoints
           .map((e) => _EndpointEntry(
-                endpointId: e.id,
-                urlController: TextEditingController(text: e.url),
-                apiKeyController: TextEditingController(text: e.apiKey),
+                endpoint: e,
                 active: e.active,
               ))
           .toList();
     } else {
-      _endpoints = [
-        _EndpointEntry(
-          endpointId: 0,
-          urlController: TextEditingController(),
-          apiKeyController: TextEditingController(),
-          active: true,
-        ),
-      ];
+      _endpoints = [];
     }
-  }
-
-  @override
-  void dispose() {
-    for (final ep in _endpoints) {
-      ep.urlController.dispose();
-      ep.apiKeyController.dispose();
-    }
-    super.dispose();
-  }
-
-  void _addEndpoint() {
-    setState(() {
-      _endpoints.add(_EndpointEntry(
-        endpointId: 0,
-        urlController: TextEditingController(),
-        apiKeyController: TextEditingController(),
-        active: true,
-      ));
-    });
   }
 
   void _removeEndpoint(int index) {
-    if (_endpoints.length <= 1) return;
     setState(() {
-      _endpoints[index].urlController.dispose();
-      _endpoints[index].apiKeyController.dispose();
       _endpoints.removeAt(index);
     });
   }
 
-  void _showHistoryEndpointPicker() async {
+  void _showEndpointPicker() async {
     final allEndpoints = await ref.read(allEndpointsProvider.future);
     if (!mounted) return;
 
-    final currentIds = _endpoints.map((e) => e.endpointId).toSet();
+    final currentIds = _endpoints.map((e) => e.endpoint.id).toSet();
 
     final available =
         allEndpoints.where((e) => !currentIds.contains(e.id)).toList();
 
     if (available.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('没有可用的历史 Endpoint')),
+        const SnackBar(content: Text('所有 Endpoint 都已添加')),
       );
       return;
     }
 
     final selected = await showDialog<List<EndpointConfig>>(
       context: context,
-      builder: (ctx) => _HistoryEndpointPickerDialog(endpoints: available),
+      builder: (ctx) => _EndpointPickerDialog(endpoints: available),
     );
 
     if (selected != null && selected.isNotEmpty) {
       setState(() {
         for (final ep in selected) {
           _endpoints.add(_EndpointEntry(
-            endpointId: ep.id,
-            urlController: TextEditingController(text: ep.url),
-            apiKeyController: TextEditingController(text: ep.apiKey),
+            endpoint: ep,
             active: true,
           ));
         }
@@ -123,12 +89,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
 
   List<EndpointConfig> _buildEndpoints() {
     return _endpoints
-        .map((e) => EndpointConfig(
-              id: e.endpointId,
-              url: e.urlController.text.trim(),
-              apiKey: e.apiKeyController.text.trim(),
-              active: e.active,
-            ))
+        .map((e) => e.endpoint.copyWith(active: e.active))
         .toList();
   }
 
@@ -200,15 +161,9 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.history, size: 20),
-                          tooltip: '从历史 Endpoint 选择',
-                          onPressed: _showHistoryEndpointPicker,
-                        ),
-                        IconButton(
-                          icon:
-                              const Icon(Icons.add_circle_outline, size: 20),
-                          tooltip: '新建 Endpoint',
-                          onPressed: _addEndpoint,
+                          icon: const Icon(Icons.add_circle_outline, size: 20),
+                          tooltip: '添加 Endpoint',
+                          onPressed: _showEndpointPicker,
                         ),
                       ],
                     ),
@@ -304,58 +259,44 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
       return Card(
         margin: const EdgeInsets.symmetric(vertical: 4),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Column(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Text('# ${index + 1}',
-                      style: Theme.of(context).textTheme.bodySmall),
-                  if (ep.endpointId > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: Chip(
-                        label: Text('ID: ${ep.endpointId}',
-                            style: const TextStyle(fontSize: 10)),
-                        padding: EdgeInsets.zero,
-                        materialTapTargetSize:
-                            MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                  const Spacer(),
-                  Transform.scale(
-                    scale: 0.7,
-                    child: Switch(
-                      value: ep.active,
-                      onChanged: (val) => setState(() => ep.active = val),
-                    ),
-                  ),
-                  if (_endpoints.length > 1)
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle_outline, size: 18),
-                      tooltip: '移除此 Endpoint',
-                      onPressed: () => _removeEndpoint(index),
-                    ),
-                ],
+              CircleAvatar(
+                radius: 14,
+                backgroundColor: Colors.blue.shade50,
+                child: Text('#${ep.endpoint.id}',
+                    style: TextStyle(fontSize: 10, color: Colors.blue.shade700)),
               ),
-              TextFormField(
-                controller: ep.urlController,
-                decoration: const InputDecoration(
-                  labelText: 'Endpoint URL',
-                  hintText: 'https://api.openai.com/v1',
-                  isDense: true,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(ep.endpoint.url,
+                        style: const TextStyle(fontSize: 13),
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text(
+                      ep.endpoint.apiKey.isEmpty
+                          ? '无 API Key'
+                          : 'Key: ${ep.endpoint.apiKey.substring(0, ep.endpoint.apiKey.length > 8 ? 8 : ep.endpoint.apiKey.length)}...',
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                    ),
+                  ],
                 ),
-                validator: (val) => val == null || val.trim().isEmpty
-                    ? '请输入 Endpoint URL'
-                    : null,
               ),
-              TextFormField(
-                controller: ep.apiKeyController,
-                decoration: const InputDecoration(
-                  labelText: 'API Key',
-                  isDense: true,
+              Transform.scale(
+                scale: 0.7,
+                child: Switch(
+                  value: ep.active,
+                  onChanged: (val) => setState(() => ep.active = val),
                 ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.remove_circle_outline, size: 18, color: Colors.red),
+                tooltip: '移除此 Endpoint',
+                onPressed: () => _removeEndpoint(index),
               ),
             ],
           ),
@@ -366,42 +307,38 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
 }
 
 class _EndpointEntry {
-  final int endpointId;
-  final TextEditingController urlController;
-  final TextEditingController apiKeyController;
+  final EndpointConfig endpoint;
   bool active;
 
   _EndpointEntry({
-    required this.endpointId,
-    required this.urlController,
-    required this.apiKeyController,
+    required this.endpoint,
     required this.active,
   });
 }
 
-class _HistoryEndpointPickerDialog extends StatefulWidget {
+class _EndpointPickerDialog extends StatefulWidget {
   final List<EndpointConfig> endpoints;
 
-  const _HistoryEndpointPickerDialog({required this.endpoints});
+  const _EndpointPickerDialog({required this.endpoints});
 
   @override
-  State<_HistoryEndpointPickerDialog> createState() =>
-      _HistoryEndpointPickerDialogState();
+  State<_EndpointPickerDialog> createState() =>
+      _EndpointPickerDialogState();
 }
 
-class _HistoryEndpointPickerDialogState
-    extends State<_HistoryEndpointPickerDialog> {
+class _EndpointPickerDialogState
+    extends State<_EndpointPickerDialog> {
   final Set<int> _selectedIds = {};
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('选择历史 Endpoint'),
+      title: const Text('选择 Endpoint'),
       content: SizedBox(
         width: 450,
         height: 400,
         child: widget.endpoints.isEmpty
-            ? const Center(child: Text('没有可用的历史 Endpoint'))
+            ? const Center(child: Text('没有可用的 Endpoint'))
             : ListView.builder(
                 itemCount: widget.endpoints.length,
                 itemBuilder: (context, index) {

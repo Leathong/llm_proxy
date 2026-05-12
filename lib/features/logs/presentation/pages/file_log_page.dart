@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,17 +28,22 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.folder_open),
-            tooltip: '选择日志文件',
-            onPressed: () => _pickAndLoadFile(ref),
+            tooltip: '选择日志目录',
+            onPressed: () => _pickDirAndShowFileSelector(ref),
           ),
-          if (logState.filePath != null)
+          if (logState.loadedFiles.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.playlist_add_check),
+              tooltip: '选择文件 (已加载 ${logState.loadedFiles.length} 个)',
+              onPressed: () => _showFileSelector(ref, logState.filePath!, logState.loadedFiles),
+            ),
+          if (logState.loadedFiles.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.refresh),
               tooltip: '重新加载',
               onPressed: () =>
-                  ref.read(logOutputProvider.notifier).loadDirectory(logState.filePath!),
+                  ref.read(logOutputProvider.notifier).loadFiles(logState.loadedFiles),
             ),
-          // Filter 按钮 — 有过滤时高亮
           if (logState.entries.isNotEmpty)
             IconButton(
               icon: Icon(
@@ -66,12 +73,159 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
     );
   }
 
-  Future<void> _pickAndLoadFile(WidgetRef ref) async {
-    final result = await FilePicker.getDirectoryPath(
+  /// 选择目录后弹出文件勾选对话框
+  Future<void> _pickDirAndShowFileSelector(WidgetRef ref) async {
+    final dir = await FilePicker.getDirectoryPath(
       dialogTitle: '选择日志目录',
     );
-    if (result != null) {
-      ref.read(logOutputProvider.notifier).loadDirectory(result);
+    if (dir != null) {
+      _showFileSelector(ref, dir, const []);
+    }
+  }
+
+  /// 弹出文件勾选对话框，让用户选择要加载的 .log 文件
+  Future<void> _showFileSelector(
+    WidgetRef ref,
+    String dirPath,
+    List<String> preSelected,
+  ) async {
+    // 扫描目录下的 .log 文件
+    final directory = Directory(dirPath);
+    final allLogFiles = <String>[];
+    try {
+      await for (final entity in directory.list()) {
+        if (entity is File && entity.path.endsWith('.log')) {
+          allLogFiles.add(entity.path);
+        }
+      }
+      allLogFiles.sort();
+    } catch (_) {
+      return;
+    }
+
+    if (allLogFiles.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('该目录下没有 .log 文件')),
+        );
+      }
+      return;
+    }
+
+    // 临时勾选状态
+    final selected = <String>{...preSelected};
+
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.playlist_add_check, size: 20, color: Colors.blue),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '选择日志文件 (${allLogFiles.length} 个)',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // 全选/取消全选
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => setDialogState(() {
+                        selected.addAll(allLogFiles);
+                      }),
+                      child: const Text('全选'),
+                    ),
+                    TextButton(
+                      onPressed: () => setDialogState(() {
+                        selected.clear();
+                      }),
+                      child: const Text('取消全选'),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '已选 ${selected.length}/${allLogFiles.length}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+                const Divider(),
+                // 文件列表
+                Flexible(
+                  child: SizedBox(
+                    width: double.maxFinite,
+                    height: 300,
+                    child: ListView.builder(
+                      itemCount: allLogFiles.length,
+                      itemBuilder: (ctx, i) {
+                        final path = allLogFiles[i];
+                        final fileName = path.split(Platform.pathSeparator).last;
+                        final isChecked = selected.contains(path);
+                        return CheckboxListTile(
+                          value: isChecked,
+                          dense: true,
+                          title: Text(
+                            fileName,
+                            style: const TextStyle(fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          onChanged: (v) => setDialogState(() {
+                            if (v == true) {
+                              selected.add(path);
+                            } else {
+                              selected.remove(path);
+                            }
+                          }),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('取消'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: selected.isEmpty
+                          ? null
+                          : () => Navigator.of(ctx).pop(selected.toList()..sort()),
+                      child: const Text('加载'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      ref.read(logOutputProvider.notifier).loadFiles(result);
     }
   }
 
@@ -232,7 +386,7 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
           children: [
             Icon(Icons.analytics_outlined, size: 80, color: Colors.grey),
             SizedBox(height: 20),
-            Text('点击右上角 📂 按钮加载日志文件（.log 或 .json）',
+            Text('点击右上角 📂 按钮选择日志目录，再勾选要加载的 .log 文件',
                 style: TextStyle(fontSize: 16, color: Colors.grey)),
           ],
         ),

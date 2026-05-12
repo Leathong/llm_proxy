@@ -245,7 +245,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final repo = ref.read(ruleRepositoryProvider);
       if (isEdit) {
         await repo.updateEndpoint(EndpointConfig(
-          id: endpoint!.id,
+          id: endpoint.id,
           url: url,
           apiKey: apiKey,
         ));
