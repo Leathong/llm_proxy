@@ -5,6 +5,7 @@ class AppSettings {
   final String? keyPath;
   final List<String> certDomains;
   final String logFileDir;
+  final bool splitByEndpoint;
 
   const AppSettings({
     this.proxyPort = 8080,
@@ -13,6 +14,7 @@ class AppSettings {
     this.keyPath,
     this.certDomains = const ['localhost', 'api.openai.com'],
     this.logFileDir = '',
+    this.splitByEndpoint = true,
   });
 
   AppSettings copyWith({
@@ -22,6 +24,7 @@ class AppSettings {
     String? keyPath,
     List<String>? certDomains,
     String? logFileDir,
+    bool? splitByEndpoint,
   }) {
     return AppSettings(
       proxyPort: proxyPort ?? this.proxyPort,
@@ -30,6 +33,7 @@ class AppSettings {
       keyPath: keyPath ?? this.keyPath,
       certDomains: certDomains ?? this.certDomains,
       logFileDir: logFileDir ?? this.logFileDir,
+      splitByEndpoint: splitByEndpoint ?? this.splitByEndpoint,
     );
   }
 }

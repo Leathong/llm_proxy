@@ -429,6 +429,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ],
                 ),
               ),
+            if (settings.logFileDir.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 110),
+                child: Row(
+                  children: [
+                    const Text('按 Endpoint 分割日志: ', style: TextStyle(fontSize: 14)),
+                    Transform.scale(
+                      scale: 0.75,
+                      child: Switch(
+                        value: settings.splitByEndpoint,
+                        onChanged: (val) =>
+                            ref.read(settingsProvider.notifier).setSplitByEndpoint(val),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      settings.splitByEndpoint ? '每个 Endpoint 独立文件' : '同一模型合并到一个文件',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
             const Divider(height: 40),
             const Text('证书管理', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),

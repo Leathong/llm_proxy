@@ -47,6 +47,10 @@ class ProxyServerDataSource {
     _logWriter.setLogFileDir(dir);
   }
 
+  void setSplitByEndpoint(bool split) {
+    _logWriter.setSplitByEndpoint(split);
+  }
+
   Future<void> start({int port = 8080, String? certPath, String? keyPath}) async {
     if (isRunning) return;
     _port = port;

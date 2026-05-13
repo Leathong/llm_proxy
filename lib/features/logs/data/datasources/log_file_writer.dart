@@ -3,13 +3,19 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 /// 代理请求/响应日志写入器。
-/// 按模型名 + endpoint ID 分文件写入日志目录。
+/// 按模型名（+ 可选的 endpoint ID）分文件写入日志目录。
 class LogFileWriter {
   String? _logFileDir;
+  bool _splitByEndpoint = true;
 
   /// 更新日志目录路径（空字符串或 null 表示不写入文件）
   void setLogFileDir(String dir) {
     _logFileDir = dir.isEmpty ? null : dir;
+  }
+
+  /// 设置是否按 endpoint 分割日志文件
+  void setSplitByEndpoint(bool split) {
+    _splitByEndpoint = split;
   }
 
   /// 写入一条完整的请求-响应日志
@@ -69,8 +75,11 @@ class LogFileWriter {
   /// 根据 model 和 endpointId 生成文件路径
   String _buildFilePath(String? model, int? endpointId) {
     final safeModel = _safeFileName(model ?? '_models');
-    final epId = endpointId?.toString() ?? '_unknown';
-    return '$_logFileDir${safeModel}_$epId.log';
+    if (_splitByEndpoint) {
+      final epId = endpointId?.toString() ?? '_unknown';
+      return '$_logFileDir${safeModel}_$epId.log';
+    }
+    return '$_logFileDir$safeModel.log';
   }
 
   /// 文件名安全处理：替换非法字符，截断过长名称

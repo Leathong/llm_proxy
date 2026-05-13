@@ -51,6 +51,11 @@ class SettingsNotifier extends Notifier<AppSettings> {
     await ref.read(settingsRepositoryProvider).setLogFileDir(path);
     ref.invalidateSelf();
   }
+
+  Future<void> setSplitByEndpoint(bool split) async {
+    await ref.read(settingsRepositoryProvider).setSplitByEndpoint(split);
+    ref.invalidateSelf();
+  }
 }
 
 final settingsProvider = NotifierProvider<SettingsNotifier, AppSettings>(

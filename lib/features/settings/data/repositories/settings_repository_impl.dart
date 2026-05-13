@@ -14,6 +14,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
           keyPath: _dataSource.loadKeyPath(),
           certDomains: _dataSource.loadCertDomains(),
           logFileDir: _dataSource.loadLogFileDir() ?? '',
+          splitByEndpoint: _dataSource.loadSplitByEndpoint(),
         );
 
   @override
@@ -47,5 +48,11 @@ class SettingsRepositoryImpl implements SettingsRepository {
   Future<void> setLogFileDir(String path) async {
     _cache = _cache.copyWith(logFileDir: path);
     await _dataSource.saveLogFileDir(path);
+  }
+
+  @override
+  Future<void> setSplitByEndpoint(bool split) async {
+    _cache = _cache.copyWith(splitByEndpoint: split);
+    await _dataSource.saveSplitByEndpoint(split);
   }
 }

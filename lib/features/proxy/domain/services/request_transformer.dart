@@ -39,6 +39,8 @@ class RequestTransformer {
       onLog?.call('注入 reasoning_effort: ${rule.reasoningEffort}');
     }
 
+    bodyJson['stream_options'] = {'include_usage': true};
+
     return bodyJson;
   }
 
