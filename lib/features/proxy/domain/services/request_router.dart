@@ -56,7 +56,9 @@ class RequestRouter {
         request.response.write('Internal Server Error: $e');
         await request.response.close();
       } catch (err) {
+        // 响应头可能已发送（流式场景中途异常），直接强制关闭
         logger.log('响应关闭异常: $err');
+        try { await request.response.close(); } catch (_) {}
       }
     }
   }
@@ -266,6 +268,11 @@ class RequestRouter {
         id: logId, time: startTime, method: request.method,
         path: request.uri.path, statusCode: HttpStatus.internalServerError,
         status: LogStatus.error, error: e.toString(),
+      );
+      logWriter.writeLog(
+        time: startTime, method: request.method, path: request.uri.path,
+        requestBody: null, statusCode: HttpStatus.internalServerError,
+        error: e.toString(),
       );
       try {
         request.response.statusCode = HttpStatus.internalServerError;

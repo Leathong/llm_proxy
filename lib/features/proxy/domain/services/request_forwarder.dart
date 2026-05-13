@@ -37,8 +37,9 @@ class RequestForwarder {
     final client = HttpClient();
     var clientDisconnected = false;
 
-    // 监听客户端断开，立即关闭上游连接
-    clientRequest.response.done.catchError((_) {
+    // 监听客户端断开：response.done 完成时说明客户端已断开或响应已关闭
+    // 注意：不能用 catchError，因为客户端断开时 done 是正常完成而非报错
+    clientRequest.response.done.whenComplete(() {
       clientDisconnected = true;
       client.close(force: true);
     });
@@ -144,7 +145,10 @@ class RequestForwarder {
         clientRequest.response.statusCode = HttpStatus.badGateway;
         clientRequest.response.write(errorResp);
         await clientRequest.response.close();
-      } catch (_) {}
+      } catch (_) {
+        // 如果响应头已发送（流式场景中途异常），强制关闭
+        try { await clientRequest.response.close(); } catch (_) {}
+      }
 
       return ForwardResult(
         statusCode: HttpStatus.badGateway,
@@ -153,6 +157,10 @@ class RequestForwarder {
       );
     } finally {
       client.close();
+      // 确保客户端响应被关闭，防止客户端一直等待
+      if (!clientDisconnected) {
+        try { await clientRequest.response.close(); } catch (_) {}
+      }
     }
   }
 }
