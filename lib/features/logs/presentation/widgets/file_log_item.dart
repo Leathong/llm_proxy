@@ -58,6 +58,23 @@ class _FileLogItemState extends State<FileLogItem> {
     _collapsingByUs = false;
   }
 
+  /// 从 response content 中提取文本预览，用于标题行快速定位
+  String _buildResponsePreview() {
+    final content = entry.response?.content;
+    if (content == null || content.isEmpty) return entry.path;
+
+    final texts = <String>[];
+    for (final block in content) {
+      if (block.type == 'text' && block.text != null) {
+        texts.add(block.text!);
+      } else if (block.type == 'tool_use' && block.name != null) {
+        texts.add('[调用工具: ${block.name}]');
+      }
+    }
+    if (texts.isEmpty) return entry.path;
+    return texts.join(' ').replaceAll('\n', ' ').trim();
+  }
+
   @override
   Widget build(BuildContext context) {
     // 状态码颜色
@@ -77,6 +94,9 @@ class _FileLogItemState extends State<FileLogItem> {
     final messageCount = entry.request?.messages.length ?? 0;
     final usage = entry.response?.usage;
 
+    // 提取 response 内容预览文本
+    final responsePreview = _buildResponsePreview();
+
     return Card(
       key: _key,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -84,11 +104,11 @@ class _FileLogItemState extends State<FileLogItem> {
       child: ExpansionTile(
         controller: _controller,
         onExpansionChanged: _onExpansionChanged,
-        // 标题行：序号 + 状态码 + 方法 + 路径 + 耗时
+        // 标题行：序号 + 状态码 + 方法 + response 预览 + 耗时
         title: Row(
           children: [
             SizedBox(
-              width: 28,
+              width: 35,
               child: Text('#${entry.index}',
                   style: const TextStyle(color: Colors.grey, fontSize: 11)),
             ),
@@ -120,8 +140,8 @@ class _FileLogItemState extends State<FileLogItem> {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(entry.path,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
+              child: Text(responsePreview,
+                  style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 13),
                   overflow: TextOverflow.ellipsis),
             ),
             if (entry.durationMs != null)
@@ -139,11 +159,19 @@ class _FileLogItemState extends State<FileLogItem> {
               ),
           ],
         ),
-        // 副标题：时间 + 模型 + 消息数
+        // 副标题：endpoint + 时间 + 模型 + 消息数
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 6),
           child: Row(
             children: [
+              // endpoint 路径（限制最大宽度，避免挤掉右侧信息）
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 200),
+                child: Text(entry.path,
+                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                    overflow: TextOverflow.ellipsis),
+              ),
+              const SizedBox(width: 8),
               Text(entry.timestamp,
                   style: const TextStyle(color: Colors.grey, fontSize: 12)),
               if (entry.model != null) ...[
@@ -154,10 +182,6 @@ class _FileLogItemState extends State<FileLogItem> {
                     style: const TextStyle(color: Colors.grey, fontSize: 12)),
               ],
               const Spacer(),
-              if (entry.request?.systemPreview != null) ...[
-                const Icon(Icons.settings, size: 13, color: Colors.purple),
-                const SizedBox(width: 4),
-              ],
               if (entry.request?.tools != null) ...[
                 const Icon(Icons.build, size: 13, color: Colors.amber),
                 const SizedBox(width: 2),
