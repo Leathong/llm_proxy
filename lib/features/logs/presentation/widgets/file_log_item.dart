@@ -97,127 +97,129 @@ class _FileLogItemState extends State<FileLogItem> {
     // 提取 response 内容预览文本
     final responsePreview = _buildResponsePreview();
 
-    return Card(
+    return SelectionArea(
       key: _key,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      elevation: 1,
-      child: ExpansionTile(
-        controller: _controller,
-        onExpansionChanged: _onExpansionChanged,
-        // 标题行：序号 + 状态码 + 方法 + response 预览 + 耗时
-        title: Row(
-          children: [
-            SizedBox(
-              width: 35,
-              child: Text('#${entry.index}',
-                  style: const TextStyle(color: Colors.grey, fontSize: 11)),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: statusColor, width: 1),
-              ),
-              child: Text('${entry.statusCode ?? "N/A"}',
-                  style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 11)),
-            ),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(entry.method,
-                  style: const TextStyle(
-                      color: Colors.blue,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 11)),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(responsePreview,
-                  style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 13),
-                  overflow: TextOverflow.ellipsis),
-            ),
-            if (entry.durationMs != null)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('${entry.durationMs}ms',
-                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                  if (entry.firstByteMs != null) ...[
-                    const SizedBox(width: 4),
-                    Text('TTFB ${entry.firstByteMs}ms',
-                        style: const TextStyle(color: Colors.blueGrey, fontSize: 11)),
-                  ],
-                ],
-              ),
-          ],
-        ),
-        // 副标题：endpoint + 时间 + 模型 + 消息数
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Row(
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        elevation: 1,
+        child: ExpansionTile(
+          controller: _controller,
+          onExpansionChanged: _onExpansionChanged,
+          // 标题行：序号 + 状态码 + 方法 + response 预览 + 耗时
+          title: Row(
             children: [
-              // endpoint 路径（限制最大宽度，避免挤掉右侧信息）
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 200),
-                child: Text(entry.path,
-                    style: const TextStyle(color: Colors.grey, fontSize: 11),
-                    overflow: TextOverflow.ellipsis),
+              SizedBox(
+                width: 35,
+                child: Text('#${entry.index}',
+                    style: const TextStyle(color: Colors.grey, fontSize: 11)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: statusColor, width: 1),
+                ),
+                child: Text('${entry.statusCode ?? "N/A"}',
+                    style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11)),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(entry.method,
+                    style: const TextStyle(
+                        color: Colors.blue,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11)),
               ),
               const SizedBox(width: 8),
-              Text(entry.timestamp,
-                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              if (entry.model != null) ...[
-                const SizedBox(width: 8),
-                const Icon(Icons.psychology, size: 14, color: Colors.grey),
-                const SizedBox(width: 4),
-                Text(entry.model!,
-                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
-              const Spacer(),
-              if (entry.request?.tools != null) ...[
-                const Icon(Icons.build, size: 13, color: Colors.amber),
-                const SizedBox(width: 2),
-                Text('${entry.request!.tools!.length}',
-                    style:
-                        const TextStyle(color: Colors.amber, fontSize: 11)),
-                const SizedBox(width: 6),
-              ],
-              if (messageCount > 0)
-                Text('$messageCount 条消息',
-                    style: const TextStyle(color: Colors.grey, fontSize: 11)),
-              if (usage != null) ...[
-                const SizedBox(width: 8),
-                const Icon(Icons.token, size: 13, color: Colors.grey),
-                const SizedBox(width: 2),
-                Text('${usage.totalInputTokens}→${usage.outputTokens ?? 0}',
-                    style: const TextStyle(color: Colors.grey, fontSize: 11)),
-              ],
+              Expanded(
+                child: Text(responsePreview,
+                    style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 13),
+                    overflow: TextOverflow.ellipsis),
+              ),
+              if (entry.durationMs != null)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('${entry.durationMs}ms',
+                        style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    if (entry.firstByteMs != null) ...[
+                      const SizedBox(width: 4),
+                      Text('TTFB ${entry.firstByteMs}ms',
+                          style: const TextStyle(color: Colors.blueGrey, fontSize: 11)),
+                    ],
+                  ],
+                ),
             ],
           ),
-        ),
-        // 展开后显示详情，点击空白区域收起
-        children: [
-          GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: _scrollThenCollapse,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              // 内部内容吸收点击，避免点击消息等内容时触发收起
-              child: GestureDetector(
-                onTap: () {},
-                child: FileLogDetail(entry: entry),
-              ),
+          // 副标题：endpoint + 时间 + 模型 + 消息数
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(
+              children: [
+                // endpoint 路径（限制最大宽度，避免挤掉右侧信息）
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 200),
+                  child: Text(entry.path,
+                      style: const TextStyle(color: Colors.grey, fontSize: 11),
+                      overflow: TextOverflow.ellipsis),
+                ),
+                const SizedBox(width: 8),
+                Text(entry.timestamp,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                if (entry.model != null) ...[
+                  const SizedBox(width: 8),
+                  const Icon(Icons.psychology, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(entry.model!,
+                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                ],
+                const Spacer(),
+                if (entry.request?.tools != null) ...[
+                  const Icon(Icons.build, size: 13, color: Colors.amber),
+                  const SizedBox(width: 2),
+                  Text('${entry.request!.tools!.length}',
+                      style:
+                          const TextStyle(color: Colors.amber, fontSize: 11)),
+                  const SizedBox(width: 6),
+                ],
+                if (messageCount > 0)
+                  Text('$messageCount 条消息',
+                      style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                if (usage != null) ...[
+                  const SizedBox(width: 8),
+                  const Icon(Icons.token, size: 13, color: Colors.grey),
+                  const SizedBox(width: 2),
+                  Text('${usage.totalInputTokens}→${usage.outputTokens ?? 0}',
+                      style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                ],
+              ],
             ),
           ),
-        ],
+          // 展开后显示详情，点击空白区域收起
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _scrollThenCollapse,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                // 内部内容吸收点击，避免点击消息等内容时触发收起
+                child: GestureDetector(
+                  onTap: () {},
+                  child: FileLogDetail(entry: entry),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

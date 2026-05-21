@@ -13,111 +13,113 @@ class FileLogDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 转发目标
-          if (entry.forwardTo != null) ...[
-            DetailSection(
-              title: '转发目标',
-              child: SelectableText(entry.forwardTo!,
-                  style: const TextStyle(fontSize: 13)),
-            ),
-            const SizedBox(height: 12),
-          ],
+    return SelectionArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 转发目标
+            if (entry.forwardTo != null) ...[
+              DetailSection(
+                title: '转发目标',
+                child: Text(entry.forwardTo!,
+                    style: const TextStyle(fontSize: 13)),
+              ),
+              const SizedBox(height: 12),
+            ],
 
-          // Token 用量
-          if (entry.response?.usage != null) ...[
-            DetailSection(
-              title: 'Token 用量',
-              child: UsageInfo(usage: entry.response!.usage!),
-            ),
-            const SizedBox(height: 12),
-          ],
+            // Token 用量
+            if (entry.response?.usage != null) ...[
+              DetailSection(
+                title: 'Token 用量',
+                child: UsageInfo(usage: entry.response!.usage!),
+              ),
+              const SizedBox(height: 12),
+            ],
 
-          // System Prompt
-          if (entry.request?.systemPreview != null) ...[
-            DetailSection(
-              title: 'System Prompt',
-              child: GestureDetector(
-                onTap: () => _showSystemDetail(context, entry.request!),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.purple.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                        color: Colors.purple.withValues(alpha: 0.15)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        entry.request!.systemPreview!,
-                        style: const TextStyle(fontSize: 12, height: 1.5),
-                        maxLines: 5,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 6),
-                      Text('点击查看完整内容',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.purple.withValues(alpha: 0.6))),
-                    ],
+            // System Prompt
+            if (entry.request?.systemPreview != null) ...[
+              DetailSection(
+                title: 'System Prompt',
+                child: GestureDetector(
+                  onTap: () => _showSystemDetail(context, entry.request!),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withValues(alpha: 0.04),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                          color: Colors.purple.withValues(alpha: 0.15)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          entry.request!.systemPreview!,
+                          style: const TextStyle(fontSize: 12, height: 1.5),
+                          maxLines: 5,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 6),
+                        Text('点击查看完整内容',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.purple.withValues(alpha: 0.6))),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-          ],
+              const SizedBox(height: 12),
+            ],
 
-          // Tools 定义
-          if (entry.request?.tools != null &&
-              entry.request!.tools!.isNotEmpty) ...[
-            DetailSection(
-              title: 'Tools (${entry.request!.tools!.length})',
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: entry.request!.tools!.map((t) {
-                  return ActionChip(
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    visualDensity: VisualDensity.compact,
-                    avatar:
-                        const Icon(Icons.build, size: 14, color: Colors.amber),
-                    label: Text(t.name, style: const TextStyle(fontSize: 11)),
-                    backgroundColor: Colors.amber.withValues(alpha: 0.08),
-                    side: BorderSide(
-                        color: Colors.amber.withValues(alpha: 0.3)),
-                    onPressed: () => _showToolDetail(context, t),
-                  );
-                }).toList(),
+            // Tools 定义
+            if (entry.request?.tools != null &&
+                entry.request!.tools!.isNotEmpty) ...[
+              DetailSection(
+                title: 'Tools (${entry.request!.tools!.length})',
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: entry.request!.tools!.map((t) {
+                    return ActionChip(
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                      avatar:
+                          const Icon(Icons.build, size: 14, color: Colors.amber),
+                      label: Text(t.name, style: const TextStyle(fontSize: 11)),
+                      backgroundColor: Colors.amber.withValues(alpha: 0.08),
+                      side: BorderSide(
+                          color: Colors.amber.withValues(alpha: 0.3)),
+                      onPressed: () => _showToolDetail(context, t),
+                    );
+                  }).toList(),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-          ],
+              const SizedBox(height: 12),
+            ],
 
-          // 对话消息列表
-          if (entry.request?.messages.isNotEmpty ?? false) ...[
-            DetailSection(
-              title: '对话消息 (${entry.request!.messages.length})',
-              child: MessageList(messages: entry.request!.messages),
-            ),
-          ],
+            // 对话消息列表
+            if (entry.request?.messages.isNotEmpty ?? false) ...[
+              DetailSection(
+                title: '对话消息 (${entry.request!.messages.length})',
+                child: MessageList(messages: entry.request!.messages),
+              ),
+            ],
 
-          // 响应内容
-          if (entry.response?.content != null &&
-              entry.response!.content!.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            DetailSection(
-              title: '响应内容',
-              child: ResponseContent(content: entry.response!.content!),
-            ),
+            // 响应内容
+            if (entry.response?.content != null &&
+                entry.response!.content!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              DetailSection(
+                title: '响应内容',
+                child: ResponseContent(content: entry.response!.content!),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -130,42 +132,44 @@ class FileLogDetail extends StatelessWidget {
         insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 700, maxHeight: 600),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.fromLTRB(20, 16, 8, 12),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom:
-                        BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+          child: SelectionArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 8, 12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom:
+                          BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.settings, size: 18, color: Colors.purple),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text('System Prompt',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w600)),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.settings, size: 18, color: Colors.purple),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text('System Prompt',
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600)),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Text(content,
+                        style: const TextStyle(fontSize: 12, height: 1.6)),
+                  ),
                 ),
-              ),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: SelectableText(content,
-                      style: const TextStyle(fontSize: 12, height: 1.6)),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -179,79 +183,81 @@ class FileLogDetail extends StatelessWidget {
         insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 700, maxHeight: 600),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.fromLTRB(20, 16, 8, 12),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom:
-                        BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+          child: SelectionArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 8, 12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom:
+                          BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+                    ),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.build, size: 18, color: Colors.amber),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(tool.name,
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600)),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-              ),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      if (tool.description != null) ...[
-                        const Text('Description',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 13)),
-                        const SizedBox(height: 8),
-                        SelectableText(tool.description!,
-                            style:
-                                const TextStyle(fontSize: 12, height: 1.6)),
-                      ],
-                      if (tool.inputSchema != null) ...[
-                        const SizedBox(height: 16),
-                        const Text('Input Schema',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 13)),
-                        const SizedBox(height: 8),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: SelectableText(
-                            const JsonEncoder.withIndent('  ')
-                                .convert(tool.inputSchema),
+                      const Icon(Icons.build, size: 18, color: Colors.amber),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(tool.name,
                             style: const TextStyle(
-                                fontSize: 11,
-                                fontFamily: 'monospace',
-                                height: 1.5),
-                          ),
-                        ),
-                      ],
+                                fontSize: 16, fontWeight: FontWeight.w600)),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
                     ],
                   ),
                 ),
-              ),
-            ],
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (tool.description != null) ...[
+                          const Text('Description',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 13)),
+                          const SizedBox(height: 8),
+                          Text(tool.description!,
+                              style:
+                                  const TextStyle(fontSize: 12, height: 1.6)),
+                        ],
+                        if (tool.inputSchema != null) ...[
+                          const SizedBox(height: 16),
+                          const Text('Input Schema',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 13)),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              const JsonEncoder.withIndent('  ')
+                                  .convert(tool.inputSchema),
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  fontFamily: 'monospace',
+                                  height: 1.5),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
