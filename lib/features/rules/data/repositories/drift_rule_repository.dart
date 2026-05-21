@@ -49,6 +49,7 @@ class DriftRuleRepository implements RuleRepository {
         active: rule.active,
         thinkingMode: rule.thinkingMode,
         reasoningEffort: rule.reasoningEffort,
+        convertThinkingToContent: rule.convertThinkingToContent,
       ));
     }
 
@@ -67,6 +68,7 @@ class DriftRuleRepository implements RuleRepository {
             active: Value(rule.active),
             thinkingMode: Value(rule.thinkingMode),
             reasoningEffort: Value(rule.reasoningEffort),
+            convertThinkingToContent: Value(rule.convertThinkingToContent),
           ));
 
       final resolvedEndpoints = <EndpointConfig>[];
@@ -118,6 +120,7 @@ class DriftRuleRepository implements RuleRepository {
         active: rule.active,
         thinkingMode: rule.thinkingMode,
         reasoningEffort: rule.reasoningEffort,
+        convertThinkingToContent: rule.convertThinkingToContent,
       );
     });
   }
@@ -135,6 +138,7 @@ class DriftRuleRepository implements RuleRepository {
           active: Value(rule.active),
           thinkingMode: Value(rule.thinkingMode),
           reasoningEffort: Value(rule.reasoningEffort),
+          convertThinkingToContent: Value(rule.convertThinkingToContent),
         ),
       );
 

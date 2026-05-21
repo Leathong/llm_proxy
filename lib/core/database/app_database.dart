@@ -32,6 +32,8 @@ class Rules extends Table {
   TextColumn get thinkingMode => text().withDefault(const Constant(''))();
   TextColumn get reasoningEffort =>
       text().withDefault(const Constant(''))();
+  BoolColumn get convertThinkingToContent =>
+      boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
 }
@@ -58,7 +60,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -67,6 +69,12 @@ class AppDatabase extends _$AppDatabase {
             // v2: rules 表新增 groupName 列
             await customStatement(
               "ALTER TABLE rules ADD COLUMN group_name TEXT NOT NULL DEFAULT ''",
+            );
+          }
+          if (from < 3) {
+            // v3: rules 表新增 convert_thinking_to_content 列
+            await customStatement(
+              "ALTER TABLE rules ADD COLUMN convert_thinking_to_content INTEGER NOT NULL DEFAULT 0",
             );
           }
         },

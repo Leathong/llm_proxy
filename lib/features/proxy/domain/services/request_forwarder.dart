@@ -27,11 +27,13 @@ class RequestForwarder {
   /// 转发请求到目标 URL，返回转发结果
   /// 当客户端断开连接时，会立即取消上游请求以节省资源
   /// SSE 流式响应会逐块透传给客户端，不再缓冲全部数据
+  /// [convertThinkingToContent] 为 true 时将 thinking/reasoning 内容转写为普通 content
   Future<ForwardResult> forward({
     required HttpRequest clientRequest,
     required String targetUrl,
     required List<int> bodyBytes,
     required String? endpointApiKey,
+    bool convertThinkingToContent = false,
   }) async {
     final uri = Uri.parse(targetUrl);
     final client = HttpClient();
@@ -102,9 +104,12 @@ class RequestForwarder {
         // 记录首字节耗时
         firstByteMs ??= DateTime.now().difference(forwardStartTime).inMilliseconds;
 
-        final chunkStr = utf8.decode(chunk, allowMalformed: true);
+        var chunkStr = utf8.decode(chunk, allowMalformed: true);
+        if (convertThinkingToContent) {
+          chunkStr = _convertThinkingChunk(chunkStr);
+        }
         responseBodyBuf.write(chunkStr);
-        clientRequest.response.add(chunk);
+        clientRequest.response.add(utf8.encode(chunkStr));
       }
 
       if (clientDisconnected) {
@@ -162,5 +167,74 @@ class RequestForwarder {
         try { await clientRequest.response.close(); } catch (_) {}
       }
     }
+  }
+
+  /// 将 SSE chunk 中的 thinking/reasoning 内容转写为普通 content
+  /// 支持 OpenAI（delta.reasoning_content → delta.content）和
+  /// Anthropic（thinking/thinking_delta → text/text_delta）两种格式
+  String _convertThinkingChunk(String chunk) {
+    final lines = chunk.split('\n');
+    final converted = <String>[];
+
+    for (final line in lines) {
+      if (!line.startsWith('data: ')) {
+        converted.add(line);
+        continue;
+      }
+
+      final dataStr = line.substring(6).trim();
+      if (dataStr == '[DONE]') {
+        converted.add(line);
+        continue;
+      }
+
+      try {
+        final json = jsonDecode(dataStr) as Map<String, dynamic>;
+
+        // OpenAI 格式：delta.reasoning_content → delta.content
+        final delta = json['choices']?[0]?['delta'];
+        if (delta is Map<String, dynamic> && delta.containsKey('reasoning_content')) {
+          final reasoning = delta['reasoning_content'];
+          delta.remove('reasoning_content');
+          if (reasoning != null && reasoning.toString().isNotEmpty) {
+            delta['content'] = reasoning;
+          }
+          converted.add('data: ${jsonEncode(json)}');
+          continue;
+        }
+
+        // Anthropic 格式：content_block_start type:thinking → type:text
+        final contentBlock = json['content_block'];
+        if (contentBlock is Map<String, dynamic> && contentBlock['type'] == 'thinking') {
+          contentBlock['type'] = 'text';
+          // 将 thinking 字段重命名为 text
+          if (contentBlock.containsKey('thinking')) {
+            contentBlock['text'] = contentBlock['thinking'];
+            contentBlock.remove('thinking');
+          }
+          converted.add('data: ${jsonEncode(json)}');
+          continue;
+        }
+
+        // Anthropic 格式：content_block_delta type:thinking_delta → type:text_delta
+        final deltaBlock = json['delta'];
+        if (deltaBlock is Map<String, dynamic> && deltaBlock['type'] == 'thinking_delta') {
+          deltaBlock['type'] = 'text_delta';
+          if (deltaBlock.containsKey('thinking')) {
+            deltaBlock['text'] = deltaBlock['thinking'];
+            deltaBlock.remove('thinking');
+          }
+          converted.add('data: ${jsonEncode(json)}');
+          continue;
+        }
+
+        converted.add(line);
+      } catch (_) {
+        // JSON 解析失败（如 chunk 被截断），原样保留
+        converted.add(line);
+      }
+    }
+
+    return converted.join('\n');
   }
 }

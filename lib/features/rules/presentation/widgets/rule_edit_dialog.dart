@@ -22,6 +22,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
   late bool _active;
   late String _thinkingMode;
   late String _reasoningEffort;
+  late bool _convertThinkingToContent;
 
   late List<_EndpointEntry> _endpoints;
 
@@ -35,6 +36,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
     _active = widget.rule?.active ?? true;
     _thinkingMode = widget.rule?.thinkingMode ?? '';
     _reasoningEffort = widget.rule?.reasoningEffort ?? '';
+    _convertThinkingToContent = widget.rule?.convertThinkingToContent ?? false;
 
     if (widget.rule != null && widget.rule!.endpoints.isNotEmpty) {
       _endpoints = widget.rule!.endpoints
@@ -104,6 +106,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
       active: _active,
       thinkingMode: _thinkingMode,
       reasoningEffort: _reasoningEffort,
+      convertThinkingToContent: _convertThinkingToContent,
     );
   }
 
@@ -199,6 +202,17 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                   onChanged: (val) =>
                       setState(() => _reasoningEffort = val ?? ''),
                   onSaved: (val) => _reasoningEffort = val ?? '',
+                ),
+                const SizedBox(height: 8),
+                Transform.scale(
+                  scale: 0.75,
+                  child: SwitchListTile(
+                    title: const Text('将模型思考转写为正常返回'),
+                    subtitle: const Text('开启后 thinking/reasoning 将作为 content 返回'),
+                    value: _convertThinkingToContent,
+                    onChanged: (val) =>
+                        setState(() => _convertThinkingToContent = val),
+                  ),
                 ),
                 Transform.scale(
                   scale: 0.75,

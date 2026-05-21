@@ -220,6 +220,7 @@ class RequestRouter {
         targetUrl: targetUrl,
         bodyBytes: newBodyBytes,
         endpointApiKey: selectedEndpoint.apiKey,
+        convertThinkingToContent: rule.convertThinkingToContent,
       );
 
       // 客户端断开连接，记录日志后直接返回

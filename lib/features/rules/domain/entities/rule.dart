@@ -10,6 +10,7 @@ class Rule {
   final bool active;
   final String thinkingMode;
   final String reasoningEffort;
+  final bool convertThinkingToContent;
 
   const Rule({
     required this.id,
@@ -21,6 +22,7 @@ class Rule {
     this.active = true,
     this.thinkingMode = '',
     this.reasoningEffort = '',
+    this.convertThinkingToContent = false,
   });
 
   List<EndpointConfig> get activeEndpoints =>
@@ -36,6 +38,7 @@ class Rule {
     bool? active,
     String? thinkingMode,
     String? reasoningEffort,
+    bool? convertThinkingToContent,
   }) {
     return Rule(
       id: id ?? this.id,
@@ -47,6 +50,7 @@ class Rule {
       active: active ?? this.active,
       thinkingMode: thinkingMode ?? this.thinkingMode,
       reasoningEffort: reasoningEffort ?? this.reasoningEffort,
+      convertThinkingToContent: convertThinkingToContent ?? this.convertThinkingToContent,
     );
   }
 }
