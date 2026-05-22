@@ -27,6 +27,17 @@ class FileLogEntry {
     required this.index,
   });
 
+  // 输出 token 速度（tokens/s），基于纯生成耗时（总耗时 - 首字节耗时）
+  double? get outputTokensPerSecond {
+    final out = response?.usage?.outputTokens;
+    final dur = durationMs;
+    if (out == null || dur == null || dur <= 0) return null;
+    // 首字节之前的耗时属于网络延迟，不计入生成速度
+    final genMs = firstByteMs != null ? dur - firstByteMs! : dur;
+    if (genMs <= 0) return null;
+    return out / (genMs / 1000.0);
+  }
+
   factory FileLogEntry.fromJson(Map<String, dynamic> json, int index) {
     return FileLogEntry(
       timestamp: json['timestamp'] as String? ?? '',

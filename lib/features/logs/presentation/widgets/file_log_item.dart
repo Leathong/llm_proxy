@@ -156,6 +156,11 @@ class _FileLogItemState extends State<FileLogItem> {
                       Text('TTFB ${entry.firstByteMs}ms',
                           style: const TextStyle(color: Colors.blueGrey, fontSize: 11)),
                     ],
+                    if (entry.outputTokensPerSecond != null) ...[
+                      const SizedBox(width: 4),
+                      Text('${entry.outputTokensPerSecond!.toStringAsFixed(1)} tok/s',
+                          style: const TextStyle(color: Colors.teal, fontSize: 11)),
+                    ],
                   ],
                 ),
             ],
