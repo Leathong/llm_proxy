@@ -434,6 +434,108 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
     });
   }
 
+  /// 弹出统计区间选择对话框
+  Future<void> _showRangeDialog(FileLogState state) async {
+    final total = state.entries.length;
+    final curStart = state.rangeStart ?? 0;
+    final curEnd = state.rangeEnd ?? total;
+
+    var tempStart = curStart.toDouble();
+    var tempEnd = curEnd.toDouble();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.linear_scale, size: 20, color: Colors.blueGrey),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text('统计区间', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '共 $total 条条目，选择统计范围：',
+                  style: const TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    children: [
+                      Text('${tempStart.toInt() + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      Expanded(
+                        child: RangeSlider(
+                          values: RangeValues(tempStart, tempEnd),
+                          min: 0,
+                          max: total.toDouble(),
+                          divisions: total > 1 ? total : null,
+                          labels: RangeLabels(
+                            '${tempStart.toInt() + 1}',
+                            '${tempEnd.toInt()}',
+                          ),
+                          onChanged: (v) => setDialogState(() {
+                            tempStart = v.start;
+                            tempEnd = v.end;
+                          }),
+                        ),
+                      ),
+                      Text('${tempEnd.toInt()}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+                Text(
+                  '显示条目 ${tempStart.toInt() + 1} ~ ${tempEnd.toInt()}（共 ${(tempEnd - tempStart).toInt()} 条）',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        ref.read(logOutputProvider.notifier).clearRange();
+                        Navigator.of(ctx).pop();
+                      },
+                      child: const Text('清除'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: () {
+                        ref.read(logOutputProvider.notifier).setRange(
+                          tempStart.toInt(),
+                          tempEnd.toInt(),
+                        );
+                        Navigator.of(ctx).pop();
+                      },
+                      child: const Text('应用'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBody(BuildContext context, FileLogState state) {
     if (state.isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -466,6 +568,7 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
       );
     }
 
+    final hasRange = state.rangeStart != null;
     final filtered = state.filteredEntries;
     final displayEntries =
         _reversed ? filtered.reversed.toList() : filtered;
@@ -475,8 +578,11 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
         LogSummaryBar(
           entries: state.entries,
           filePath: state.filePath,
-          filteredEntries: state.filter.isEmpty ? null : filtered,
+          filteredEntries: state.filter.isEmpty && !hasRange ? null : filtered,
           subtractFirstByte: _subtractFirstByte,
+          rangeStart: state.rangeStart,
+          rangeEnd: state.rangeEnd,
+          onRangeTap: () => _showRangeDialog(state),
         ),
         const Divider(height: 1),
         if (displayEntries.isEmpty)

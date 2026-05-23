@@ -66,6 +66,8 @@ class FileLogState {
   final bool isLoading;
   final FileLogFilter filter;       // 当前过滤条件
   final List<String> loadedFiles;   // 当前已加载的文件路径列表
+  final int? rangeStart;            // 统计区间起始索引（含），null=全部
+  final int? rangeEnd;              // 统计区间结束索引（不含），null=全部
 
   const FileLogState({
     this.entries = const [],
@@ -74,6 +76,8 @@ class FileLogState {
     this.isLoading = false,
     this.filter = const FileLogFilter(),
     this.loadedFiles = const [],
+    this.rangeStart,
+    this.rangeEnd,
   });
 
   FileLogState copyWith({
@@ -83,6 +87,9 @@ class FileLogState {
     bool? isLoading,
     FileLogFilter? filter,
     List<String>? loadedFiles,
+    int? rangeStart,
+    int? rangeEnd,
+    bool clearRange = false,
   }) {
     return FileLogState(
       entries: entries ?? this.entries,
@@ -91,13 +98,25 @@ class FileLogState {
       isLoading: isLoading ?? this.isLoading,
       filter: filter ?? this.filter,
       loadedFiles: loadedFiles ?? this.loadedFiles,
+      rangeStart: clearRange ? null : (rangeStart ?? this.rangeStart),
+      rangeEnd: clearRange ? null : (rangeEnd ?? this.rangeEnd),
     );
   }
 
-  /// 应用过滤条件后的条目列表
+  /// 按索引区间截取后的条目列表（无区间时返回全部）
+  List<FileLogEntry> get rangeEntries {
+    if (rangeStart == null || rangeEnd == null) return entries;
+    final start = rangeStart!.clamp(0, entries.length);
+    final end = rangeEnd!.clamp(start, entries.length);
+    if (start >= end) return entries;
+    return entries.sublist(start, end);
+  }
+
+  /// 应用过滤条件后的条目列表（基于区间截取结果）
   List<FileLogEntry> get filteredEntries {
-    if (filter.isEmpty) return entries;
-    return entries.where(filter.matches).toList();
+    final base = rangeEntries;
+    if (filter.isEmpty) return base;
+    return base.where(filter.matches).toList();
   }
 }
 
@@ -241,6 +260,19 @@ class FileLogNotifier extends Notifier<FileLogState> {
   /// 设置过滤条件
   void setFilter(FileLogFilter filter) {
     state = state.copyWith(filter: filter);
+  }
+
+  /// 设置统计区间（索引范围，含头不含尾）
+  void setRange(int start, int end) {
+    final len = state.entries.length;
+    final clampedStart = start.clamp(0, len);
+    final clampedEnd = end.clamp(clampedStart, len);
+    state = state.copyWith(rangeStart: clampedStart, rangeEnd: clampedEnd);
+  }
+
+  /// 清除统计区间，恢复为全部条目
+  void clearRange() {
+    state = state.copyWith(clearRange: true);
   }
 
   /// 清空已加载的日志

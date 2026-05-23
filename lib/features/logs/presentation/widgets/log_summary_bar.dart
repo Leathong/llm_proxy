@@ -9,6 +9,9 @@ class LogSummaryBar extends StatelessWidget {
 
   /// 过滤后的条目（非空时以此为准计算统计）
   final List<FileLogEntry>? filteredEntries;
+  final int? rangeStart;
+  final int? rangeEnd;
+  final VoidCallback? onRangeTap;
 
   const LogSummaryBar({
     super.key,
@@ -16,6 +19,9 @@ class LogSummaryBar extends StatelessWidget {
     this.filePath,
     this.filteredEntries,
     required this.subtractFirstByte,
+    this.rangeStart,
+    this.rangeEnd,
+    this.onRangeTap,
   });
 
   /// 百分位计算，支持 int/double 混合列表
@@ -105,6 +111,15 @@ class LogSummaryBar extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
+                  _StatChip(
+                    label: '范围',
+                    value: rangeStart != null && rangeEnd != null
+                        ? '${rangeStart! + 1}-$rangeEnd / $totalRequests'
+                        : '全部 / $totalRequests',
+                    color: Colors.blueGrey,
+                    onTap: onRangeTap,
+                  ),
+                  const SizedBox(width: 8),
                   _StatChip(label: '请求', value: '$totalRequests', color: Colors.blue),
                   const SizedBox(width: 8),
                   _StatChip(label: '成功', value: '$successCount', color: Colors.green),
@@ -241,8 +256,9 @@ class LogSummaryBar extends StatelessWidget {
     required String unit,
     required int count,
     bool descending = false,
+    String? maxLabel,
   }) {
-    String fmt(num v) => unit == 'ms' ? '${v}ms' : '${v.toStringAsFixed(1)} $unit';
+    String fmt(num v) => unit == 'ms' ? '${v.toStringAsFixed(0)}ms' : '${v.toStringAsFixed(1)} $unit';
     double ratio(num v) {
       if (max.toDouble() <= 0 || v.toDouble() <= 0) return 0;
       return descending ? (max / v).toDouble() : (v / max).toDouble();
@@ -273,7 +289,7 @@ class LogSummaryBar extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              _MetricRow(label: descending ? '最慢' : '最快', value: fmt(max), ratio: 1.0, barColor: Colors.red),
+              _MetricRow(label: maxLabel ?? '最慢', value: fmt(max), ratio: 1.0, barColor: Colors.red),
               _MetricRow(label: 'P90', value: fmt(p90), ratio: ratio(p90), barColor: Colors.orange),
               _MetricRow(label: 'P70', value: fmt(p70), ratio: ratio(p70), barColor: Colors.amber),
               _MetricRow(label: 'P50', value: fmt(p50), ratio: ratio(p50), barColor: Colors.teal),
