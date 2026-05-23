@@ -57,7 +57,9 @@ class LogSummaryBar extends StatelessWidget {
     int totalCacheRead = 0;
     int entryWithUsage = 0;
 
-    // 收集输出 token 速度（tokens/s）
+    // 计算平均输出 token 速度（总 token / 总时间）
+    int totalOutputWithTime = 0;
+    int totalGenerationMs = 0;
     final outputSpeeds = <double>[];
     for (final entry in statsEntries) {
       final usage = entry.response?.usage;
@@ -68,13 +70,22 @@ class LogSummaryBar extends StatelessWidget {
         totalCacheRead += usage.cacheReadInputTokens ?? 0;
         entryWithUsage++;
       }
+      final out = usage?.outputTokens;
+      final dur = entry.durationMs;
+      if (out != null && dur != null && dur > 0) {
+        final baseMs = subtractFirstByte && entry.firstByteMs != null ? dur - entry.firstByteMs! : dur;
+        if (baseMs > 0) {
+          totalOutputWithTime += out;
+          totalGenerationMs += baseMs;
+        }
+      }
       final speed = entry.outputTokensPerSecond(subtractFirstByte: subtractFirstByte);
       if (speed != null) {
         outputSpeeds.add(speed);
       }
     }
+    final avgSpeed = totalGenerationMs > 0 ? totalOutputWithTime / (totalGenerationMs / 1000.0) : null;
     outputSpeeds.sort((a, b) => b.compareTo(a)); // 降序：从快到慢，last 即最慢
-    final speedP90 = _percentile(outputSpeeds, 90);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -138,10 +149,10 @@ class LogSummaryBar extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                   ],
-                  if (outputSpeeds.isNotEmpty) ...[
+                  if (avgSpeed != null) ...[
                     _StatChip(
                       label: '速度',
-                      value: '${speedP90.toStringAsFixed(1)} tok/s',
+                      value: '${avgSpeed.toStringAsFixed(1)} tok/s',
                       color: Colors.cyan,
                       onTap: () => _showMetricStats(
                         context,
@@ -151,6 +162,7 @@ class LogSummaryBar extends StatelessWidget {
                         iconColor: Colors.cyan,
                         unit: 'tok/s',
                         descending: true,
+                        avgOverride: avgSpeed,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -188,12 +200,13 @@ class LogSummaryBar extends StatelessWidget {
     required Color iconColor,
     required String unit,
     bool descending = false,
+    num? avgOverride,
   }) {
     final max = sorted.last;
     final p90 = _percentile(sorted, 90);
     final p70 = _percentile(sorted, 70);
     final p50 = _percentile(sorted, 50);
-    final avg = sorted.fold<num>(0, (s, v) => s + v) / sorted.length;
+    final avg = avgOverride ?? (sorted.fold<num>(0, (s, v) => s + v) / sorted.length);
 
     showDialog(
       context: context,

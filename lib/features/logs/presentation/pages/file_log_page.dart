@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_proxy/features/logs/presentation/providers/file_log_providers.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/file_log_item.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_summary_bar.dart';
+import 'package:llm_proxy/features/settings/presentation/providers/settings_providers.dart';
 
 class FileLogPage extends ConsumerStatefulWidget {
   const FileLogPage({super.key});
@@ -17,6 +18,59 @@ class FileLogPage extends ConsumerStatefulWidget {
 class _FileLogPageState extends ConsumerState<FileLogPage> {
   bool _reversed = false;
   bool _subtractFirstByte = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreSelection());
+  }
+
+  Future<void> _restoreSelection() async {
+    if (!mounted) return;
+    final prefs = ref.read(sharedPreferencesProvider);
+    final savedFiles = prefs.getStringList('fileLogLoadedFiles');
+    if (savedFiles != null && savedFiles.isNotEmpty) {
+      final existingFiles =
+          savedFiles.where((f) => File(f).existsSync()).toList();
+      if (existingFiles.isNotEmpty) {
+        ref.read(logOutputProvider.notifier).loadFiles(existingFiles);
+      }
+    }
+  }
+
+  Future<void> _saveSelection(List<String> filePaths) async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs.setStringList('fileLogLoadedFiles', filePaths);
+  }
+
+  Future<void> _clearSavedSelection() async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs.remove('fileLogLoadedFiles');
+  }
+
+  Future<void> _confirmClearLog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('清空日志'),
+        content: const Text('确定要清空当前选中的日志文件吗？此操作不可撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('清空'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ref.read(logOutputProvider.notifier).clearLoadedFiles();
+      _clearSavedSelection();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +128,16 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
             IconButton(
               icon: const Icon(Icons.close),
               tooltip: '关闭文件',
-              onPressed: () => ref.read(logOutputProvider.notifier).clear(),
+              onPressed: () {
+                ref.read(logOutputProvider.notifier).clear();
+                _clearSavedSelection();
+              },
+            ),
+          if (logState.loadedFiles.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.cleaning_services),
+              tooltip: '清空当前文件',
+              onPressed: () => _confirmClearLog(),
             ),
         ],
       ),
@@ -234,6 +297,7 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
     );
 
     if (result != null && result.isNotEmpty) {
+      _saveSelection(result);
       ref.read(logOutputProvider.notifier).loadFiles(result);
     }
   }

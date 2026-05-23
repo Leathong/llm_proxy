@@ -247,6 +247,17 @@ class FileLogNotifier extends Notifier<FileLogState> {
   void clear() {
     state = const FileLogState();
   }
+
+  /// 清空当前已加载的文件内容（物理删除文件内容）
+  Future<void> clearLoadedFiles() async {
+    final paths = List<String>.from(state.loadedFiles);
+    for (final path in paths) {
+      try {
+        await File(path).writeAsString('');
+      } catch (_) {}
+    }
+    clear();
+  }
 }
 
 final logOutputProvider =
