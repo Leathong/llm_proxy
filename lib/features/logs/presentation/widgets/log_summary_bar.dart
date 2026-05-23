@@ -25,6 +25,13 @@ class LogSummaryBar extends StatelessWidget {
     return sorted[idx];
   }
 
+  /// 格式化毫秒为可读时长
+  String _formatDuration(int ms) {
+    if (ms >= 60000) return '${(ms / 60000).toStringAsFixed(2)}min';
+    if (ms >= 1000) return '${(ms / 1000).toStringAsFixed(2)}s';
+    return '${ms}ms';
+  }
+
   @override
   Widget build(BuildContext context) {
     final statsEntries = filteredEntries ?? entries;
@@ -37,6 +44,9 @@ class LogSummaryBar extends StatelessWidget {
 
     final durations = statsEntries.where((e) => e.durationMs != null).map((e) => e.durationMs!).toList()..sort();
     final p90 = _percentile(durations, 90);
+    final totalDurationMs = statsEntries
+        .where((e) => e.durationMs != null)
+        .fold<int>(0, (sum, e) => sum + e.durationMs!);
 
     final ttfbDurations = statsEntries.where((e) => e.firstByteMs != null).map((e) => e.firstByteMs!).toList()..sort();
     final ttfbP90 = _percentile(ttfbDurations, 90);
@@ -72,82 +82,97 @@ class LogSummaryBar extends StatelessWidget {
       child: Row(
         children: [
           if (filePath != null)
-            Expanded(
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
               child: Text(
                 filePath!.split('/').last,
                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                overflow: TextOverflow.ellipsis,
               ),
             ),
-          _StatChip(label: '请求', value: '$totalRequests', color: Colors.blue),
-          const SizedBox(width: 8),
-          _StatChip(label: '成功', value: '$successCount', color: Colors.green),
-          const SizedBox(width: 8),
-          _StatChip(label: '失败', value: '$errorCount', color: Colors.red),
-          const SizedBox(width: 8),
-          _StatChip(
-            label: 'P90',
-            value: '${p90}ms',
-            color: Colors.orange,
-            onTap: durations.isNotEmpty
-                ? () => _showMetricStats(
-                      context,
-                      sorted: durations,
-                      title: '总耗时统计',
-                      icon: Icons.timer_outlined,
-                      iconColor: Colors.orange,
-                      unit: 'ms',
-                    )
-                : null,
-          ),
-          const SizedBox(width: 8),
-          if (ttfbDurations.isNotEmpty) ...[
-            _StatChip(
-              label: 'TTFB',
-              value: '${ttfbP90}ms',
-              color: Colors.teal,
-              onTap: () => _showMetricStats(
-                context,
-                sorted: ttfbDurations,
-                title: '首字节耗时 (TTFB)',
-                icon: Icons.timer_outlined,
-                iconColor: Colors.teal,
-                unit: 'ms',
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _StatChip(label: '请求', value: '$totalRequests', color: Colors.blue),
+                  const SizedBox(width: 8),
+                  _StatChip(label: '成功', value: '$successCount', color: Colors.green),
+                  const SizedBox(width: 8),
+                  _StatChip(label: '失败', value: '$errorCount', color: Colors.red),
+                  const SizedBox(width: 8),
+                  _StatChip(
+                    label: 'P90',
+                    value: '${p90}ms',
+                    color: Colors.orange,
+                    onTap: durations.isNotEmpty
+                        ? () => _showMetricStats(
+                              context,
+                              sorted: durations,
+                              title: '总耗时统计',
+                              icon: Icons.timer_outlined,
+                              iconColor: Colors.orange,
+                              unit: 'ms',
+                            )
+                        : null,
+                  ),
+                  const SizedBox(width: 8),
+                  _StatChip(
+                    label: '总耗时',
+                    value: _formatDuration(totalDurationMs),
+                    color: Colors.indigo,
+                  ),
+                  const SizedBox(width: 8),
+                  if (ttfbDurations.isNotEmpty) ...[
+                    _StatChip(
+                      label: 'TTFB',
+                      value: '${ttfbP90}ms',
+                      color: Colors.teal,
+                      onTap: () => _showMetricStats(
+                        context,
+                        sorted: ttfbDurations,
+                        title: '首字节耗时 (TTFB)',
+                        icon: Icons.timer_outlined,
+                        iconColor: Colors.teal,
+                        unit: 'ms',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  if (outputSpeeds.isNotEmpty) ...[
+                    _StatChip(
+                      label: '速度',
+                      value: '${speedP90.toStringAsFixed(1)} tok/s',
+                      color: Colors.cyan,
+                      onTap: () => _showMetricStats(
+                        context,
+                        sorted: outputSpeeds,
+                        title: '输出 Token 速度',
+                        icon: Icons.speed,
+                        iconColor: Colors.cyan,
+                        unit: 'tok/s',
+                        descending: true,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  _StatChip(
+                    label: 'Tokens',
+                    value: '${_formatNumber(totalInput)} / ${_formatNumber(totalOutput)}',
+                    color: Colors.purple,
+                    onTap: entryWithUsage > 0
+                        ? () => _showTokenStats(
+                              context,
+                              totalInput: totalInput,
+                              totalOutput: totalOutput,
+                              totalCacheCreation: totalCacheCreation,
+                              totalCacheRead: totalCacheRead,
+                              entryCount: entryWithUsage,
+                            )
+                        : null,
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 8),
-          ],
-          if (outputSpeeds.isNotEmpty) ...[
-            _StatChip(
-              label: '速度',
-              value: '${speedP90.toStringAsFixed(1)} tok/s',
-              color: Colors.cyan,
-              onTap: () => _showMetricStats(
-                context,
-                sorted: outputSpeeds,
-                title: '输出 Token 速度',
-                icon: Icons.speed,
-                iconColor: Colors.cyan,
-                unit: 'tok/s',
-                descending: true,
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
-          _StatChip(
-            label: 'Tokens',
-            value: '${_formatNumber(totalInput)} / ${_formatNumber(totalOutput)}',
-            color: Colors.purple,
-            onTap: entryWithUsage > 0
-                ? () => _showTokenStats(
-                      context,
-                      totalInput: totalInput,
-                      totalOutput: totalOutput,
-                      totalCacheCreation: totalCacheCreation,
-                      totalCacheRead: totalCacheRead,
-                      entryCount: entryWithUsage,
-                    )
-                : null,
           ),
         ],
       ),
