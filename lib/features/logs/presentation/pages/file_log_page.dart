@@ -16,6 +16,7 @@ class FileLogPage extends ConsumerStatefulWidget {
 
 class _FileLogPageState extends ConsumerState<FileLogPage> {
   bool _reversed = false;
+  bool _subtractFirstByte = false;
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +61,14 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
               ),
               tooltip: _reversed ? '切换为正序' : '切换为倒序',
               onPressed: () => setState(() => _reversed = !_reversed),
+            ),
+          if (logState.entries.isNotEmpty)
+            IconButton(
+              icon: Icon(
+                _subtractFirstByte ? Icons.flash_on : Icons.schedule,
+              ),
+              tooltip: _subtractFirstByte ? '速度已减去首字节时间' : '速度包含首字节时间',
+              onPressed: () => setState(() => _subtractFirstByte = !_subtractFirstByte),
             ),
           if (logState.entries.isNotEmpty)
             IconButton(
@@ -403,6 +412,7 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
           entries: state.entries,
           filePath: state.filePath,
           filteredEntries: state.filter.isEmpty ? null : filtered,
+          subtractFirstByte: _subtractFirstByte,
         ),
         const Divider(height: 1),
         if (displayEntries.isEmpty)
@@ -417,7 +427,10 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
             child: ListView.builder(
               itemCount: displayEntries.length,
               itemBuilder: (context, index) =>
-                  FileLogItem(entry: displayEntries[index]),
+                  FileLogItem(
+                entry: displayEntries[index],
+                subtractFirstByte: _subtractFirstByte,
+              ),
             ),
           ),
       ],

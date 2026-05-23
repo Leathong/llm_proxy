@@ -5,8 +5,13 @@ import 'package:llm_proxy/features/logs/presentation/widgets/file_log_detail.dar
 /// 单条日志条目，展开后点击空白区域可收起
 class FileLogItem extends StatefulWidget {
   final FileLogEntry entry;
+  final bool subtractFirstByte;
 
-  const FileLogItem({super.key, required this.entry});
+  const FileLogItem({
+    super.key,
+    required this.entry,
+    required this.subtractFirstByte,
+  });
 
   @override
   State<FileLogItem> createState() => _FileLogItemState();
@@ -93,6 +98,9 @@ class _FileLogItemState extends State<FileLogItem> {
 
     final messageCount = entry.request?.messages.length ?? 0;
     final usage = entry.response?.usage;
+    final outputSpeed = entry.outputTokensPerSecond(
+      subtractFirstByte: widget.subtractFirstByte,
+    );
 
     // 提取 response 内容预览文本
     final responsePreview = _buildResponsePreview();
@@ -156,9 +164,9 @@ class _FileLogItemState extends State<FileLogItem> {
                       Text('TTFB ${entry.firstByteMs}ms',
                           style: const TextStyle(color: Colors.blueGrey, fontSize: 11)),
                     ],
-                    if (entry.outputTokensPerSecond != null) ...[
+                    if (outputSpeed != null) ...[
                       const SizedBox(width: 4),
-                      Text('${entry.outputTokensPerSecond!.toStringAsFixed(1)} tok/s',
+                      Text('${outputSpeed.toStringAsFixed(1)} tok/s',
                           style: const TextStyle(color: Colors.teal, fontSize: 11)),
                     ],
                   ],

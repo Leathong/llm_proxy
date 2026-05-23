@@ -5,6 +5,7 @@ import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 class LogSummaryBar extends StatelessWidget {
   final List<FileLogEntry> entries;
   final String? filePath;
+  final bool subtractFirstByte;
 
   /// 过滤后的条目（非空时以此为准计算统计）
   final List<FileLogEntry>? filteredEntries;
@@ -14,6 +15,7 @@ class LogSummaryBar extends StatelessWidget {
     required this.entries,
     this.filePath,
     this.filteredEntries,
+    required this.subtractFirstByte,
   });
 
   /// 百分位计算，支持 int/double 混合列表
@@ -56,7 +58,7 @@ class LogSummaryBar extends StatelessWidget {
         totalCacheRead += usage.cacheReadInputTokens ?? 0;
         entryWithUsage++;
       }
-      final speed = entry.outputTokensPerSecond;
+      final speed = entry.outputTokensPerSecond(subtractFirstByte: subtractFirstByte);
       if (speed != null) {
         outputSpeeds.add(speed);
       }
@@ -203,9 +205,8 @@ class LogSummaryBar extends StatelessWidget {
     bool descending = false,
   }) {
     String fmt(num v) => unit == 'ms' ? '${v}ms' : '${v.toStringAsFixed(1)} $unit';
-    // 降序时 max 是最小值（最慢），ratio 用 min/max 反转
     double ratio(num v) {
-      if (max.toDouble() <= 0) return 0;
+      if (max.toDouble() <= 0 || v.toDouble() <= 0) return 0;
       return descending ? (max / v).toDouble() : (v / max).toDouble();
     }
 
