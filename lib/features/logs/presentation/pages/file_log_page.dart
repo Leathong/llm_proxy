@@ -442,6 +442,8 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
 
     var tempStart = curStart.toDouble();
     var tempEnd = curEnd.toDouble();
+    final startCtrl = TextEditingController(text: '${curStart + 1}');
+    final endCtrl = TextEditingController(text: '$curEnd');
 
     await showDialog(
       context: context,
@@ -471,37 +473,93 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  '共 $total 条条目，选择统计范围：',
+                  '共 $total 条，选择统计范围（1 起始）：',
                   style: const TextStyle(fontSize: 13, color: Colors.grey),
                 ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    children: [
-                      Text('${tempStart.toInt() + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                      Expanded(
-                        child: RangeSlider(
-                          values: RangeValues(tempStart, tempEnd),
-                          min: 0,
-                          max: total.toDouble(),
-                          divisions: total > 1 ? total : null,
-                          labels: RangeLabels(
-                            '${tempStart.toInt() + 1}',
-                            '${tempEnd.toInt()}',
-                          ),
-                          onChanged: (v) => setDialogState(() {
-                            tempStart = v.start;
-                            tempEnd = v.end;
-                          }),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    SizedBox(
+                      width: 80,
+                      child: TextField(
+                        controller: startCtrl,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        decoration: const InputDecoration(
+                          labelText: '起始',
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          border: OutlineInputBorder(),
                         ),
+                        style: const TextStyle(fontSize: 13),
+                        onChanged: (v) {
+                          final parsed = int.tryParse(v);
+                          if (parsed == null) return;
+                          final clamped = parsed.clamp(1, tempEnd.toInt());
+                          if (clamped != parsed) {
+                            startCtrl.text = '$clamped';
+                            startCtrl.selection = TextSelection.collapsed(offset: startCtrl.text.length);
+                          }
+                          setDialogState(() {
+                            tempStart = (clamped - 1).toDouble();
+                          });
+                        },
                       ),
-                      Text('${tempEnd.toInt()}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                    ],
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Text('—', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    ),
+                    SizedBox(
+                      width: 80,
+                      child: TextField(
+                        controller: endCtrl,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        decoration: const InputDecoration(
+                          labelText: '结束',
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          border: OutlineInputBorder(),
+                        ),
+                        style: const TextStyle(fontSize: 13),
+                        onChanged: (v) {
+                          final parsed = int.tryParse(v);
+                          if (parsed == null) return;
+                          final clamped = parsed.clamp(tempStart.toInt() + 1, total);
+                          if (clamped != parsed) {
+                            endCtrl.text = '$clamped';
+                            endCtrl.selection = TextSelection.collapsed(offset: endCtrl.text.length);
+                          }
+                          setDialogState(() {
+                            tempEnd = clamped.toDouble();
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                RangeSlider(
+                  values: RangeValues(tempStart, tempEnd),
+                  min: 0,
+                  max: total.toDouble(),
+                  divisions: total > 1 ? total : null,
+                  labels: RangeLabels(
+                    '${tempStart.toInt() + 1}',
+                    '${tempEnd.toInt()}',
                   ),
+                  onChanged: (v) {
+                    setDialogState(() {
+                      tempStart = v.start;
+                      tempEnd = v.end;
+                    });
+                    startCtrl.text = '${v.start.toInt() + 1}';
+                    endCtrl.text = '${v.end.toInt()}';
+                  },
                 ),
                 Text(
-                  '显示条目 ${tempStart.toInt() + 1} ~ ${tempEnd.toInt()}（共 ${(tempEnd - tempStart).toInt()} 条）',
+                  '显示 ${tempStart.toInt() + 1} ~ ${tempEnd.toInt()}，共 ${(tempEnd - tempStart).toInt()} 条',
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 16),
@@ -534,6 +592,10 @@ class _FileLogPageState extends ConsumerState<FileLogPage> {
         ),
       ),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      startCtrl.dispose();
+      endCtrl.dispose();
+    });
   }
 
   Widget _buildBody(BuildContext context, FileLogState state) {
