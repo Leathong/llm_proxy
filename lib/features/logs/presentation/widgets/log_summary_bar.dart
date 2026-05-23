@@ -43,31 +43,30 @@ class LogSummaryBar extends StatelessWidget {
     final statsEntries = filteredEntries ?? entries;
 
     final totalRequests = statsEntries.length;
-    final successCount = statsEntries
-        .where((e) => e.statusCode != null && e.statusCode! >= 200 && e.statusCode! < 300)
-        .length;
-    final errorCount = totalRequests - successCount;
-
-    final durations = statsEntries.where((e) => e.durationMs != null).map((e) => e.durationMs!).toList()..sort();
-    final p90 = _percentile(durations, 90);
-    final totalDurationMs = statsEntries
-        .where((e) => e.durationMs != null)
-        .fold<int>(0, (sum, e) => sum + e.durationMs!);
-
-    final ttfbDurations = statsEntries.where((e) => e.firstByteMs != null).map((e) => e.firstByteMs!).toList()..sort();
-    final ttfbP90 = _percentile(ttfbDurations, 90);
-
-    int totalInput = 0;
-    int totalOutput = 0;
-    int totalCacheCreation = 0;
-    int totalCacheRead = 0;
+    int successCount = 0;
+    int totalInput = 0, totalOutput = 0;
+    int totalCacheCreation = 0, totalCacheRead = 0;
     int entryWithUsage = 0;
-
-    // 计算平均输出 token 速度（总 token / 总时间）
-    int totalOutputWithTime = 0;
-    int totalGenerationMs = 0;
+    int totalOutputWithTime = 0, totalGenerationMs = 0;
+    int totalDurationMs = 0;
+    final durations = <int>[];
+    final ttfbDurations = <int>[];
     final outputSpeeds = <double>[];
+
+    // 单次遍历完成所有统计计算
     for (final entry in statsEntries) {
+      final statusCode = entry.statusCode;
+      if (statusCode != null && statusCode >= 200 && statusCode < 300) successCount++;
+
+      final duration = entry.durationMs;
+      if (duration != null) {
+        durations.add(duration);
+        totalDurationMs += duration;
+      }
+
+      final ttfb = entry.firstByteMs;
+      if (ttfb != null) ttfbDurations.add(ttfb);
+
       final usage = entry.response?.usage;
       if (usage != null) {
         totalInput += usage.totalInputTokens;
@@ -76,6 +75,7 @@ class LogSummaryBar extends StatelessWidget {
         totalCacheRead += usage.cacheReadInputTokens ?? 0;
         entryWithUsage++;
       }
+
       final out = usage?.outputTokens;
       final dur = entry.durationMs;
       if (out != null && dur != null && dur > 0) {
@@ -85,11 +85,16 @@ class LogSummaryBar extends StatelessWidget {
           totalGenerationMs += baseMs;
         }
       }
+
       final speed = entry.outputTokensPerSecond(subtractFirstByte: subtractFirstByte);
-      if (speed != null) {
-        outputSpeeds.add(speed);
-      }
+      if (speed != null) outputSpeeds.add(speed);
     }
+
+    final errorCount = totalRequests - successCount;
+    durations.sort();
+    final p90 = _percentile(durations, 90);
+    ttfbDurations.sort();
+    final ttfbP90 = _percentile(ttfbDurations, 90);
     final avgSpeed = totalGenerationMs > 0 ? totalOutputWithTime / (totalGenerationMs / 1000.0) : null;
     outputSpeeds.sort((a, b) => b.compareTo(a)); // 降序：从快到慢，last 即最慢
 
