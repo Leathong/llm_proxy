@@ -102,7 +102,7 @@ class _UnifiedLogPageState extends ConsumerState<LogPage> {
                   child: ListTile(
                     leading: const Icon(Icons.delete_forever),
                     title: const Text('清空全部日志'),
-                    subtitle: Text('共 ${state.allEntries.length} 条'),
+                    subtitle: const Text('清空整个数据库的所有日志记录'),
                     contentPadding: EdgeInsets.zero,
                     visualDensity: VisualDensity.compact,
                   ),
@@ -265,7 +265,7 @@ class _UnifiedLogPageState extends ConsumerState<LogPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('清空全部日志'),
-        content: const Text('确定要清空全部日志记录吗？此操作不可撤销。'),
+        content: const Text('确定要清空数据库中的所有日志记录吗？此操作不可撤销。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
