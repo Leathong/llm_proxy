@@ -7,19 +7,19 @@ import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.
 import 'package:llm_proxy/features/settings/domain/entities/app_settings.dart';
 import 'package:llm_proxy/features/settings/presentation/providers/settings_providers.dart';
 
-Future<String?> _pickDirectory() async {
-  try {
-    final result = await Process.run('osascript', [
-      '-e', 'set folderPath to choose folder with prompt "选择日志文件保存目录"',
-      '-e', 'return POSIX path of folderPath',
-    ]);
-    if (result.exitCode == 0) {
-      final path = (result.stdout as String).trim();
-      if (path.isNotEmpty) return path;
-    }
-  } catch (_) {}
-  return null;
-}
+// Future<String?> _pickDirectory() async {
+//   try {
+//     final result = await Process.run('osascript', [
+//       '-e', 'set folderPath to choose folder with prompt "选择日志文件保存目录"',
+//       '-e', 'return POSIX path of folderPath',
+//     ]);
+//     if (result.exitCode == 0) {
+//       final path = (result.stdout as String).trim();
+//       if (path.isNotEmpty) return path;
+//     }
+//   } catch (_) {}
+//   return null;
+// }
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -335,100 +335,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                const Text('请求日志目录: ', style: TextStyle(fontSize: 16)),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: TextEditingController(text: settings.logFileDir)
-                      ..selection = TextSelection.collapsed(offset: settings.logFileDir.length),
-                    decoration: InputDecoration(
-                      hintText: '留空则不记录请求日志',
-                      border: const OutlineInputBorder(),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.folder_open, size: 20),
-                        tooltip: '选择日志保存目录',
-                        onPressed: () async {
-                          final result = await _pickDirectory();
-                          if (result != null && context.mounted) {
-                            ref.read(settingsProvider.notifier).setLogFileDir(result);
-                          }
-                        },
-                      ),
-                    ),
-                    onChanged: (val) => ref.read(settingsProvider.notifier).setLogFileDir(val),
-                  ),
-                ),
-              ],
-            ),
-            if (settings.logFileDir.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8, left: 110),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '日志将按模型分文件写入: ${settings.logFileDir}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton.icon(
-                      onPressed: () async {
-                        final confirmed = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('确认清空'),
-                            content: const Text('确定要清空日志目录下所有 .log 文件吗？此操作不可撤销。'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(false),
-                                child: const Text('取消'),
-                              ),
-                              FilledButton(
-                                onPressed: () => Navigator.of(context).pop(true),
-                                child: const Text('清空'),
-                              ),
-                            ],
-                          ),
-                        );
-                        if (confirmed == true) {
-                          try {
-                            final dir = Directory(settings.logFileDir);
-                            if (await dir.exists()) {
-                              await for (final entity in dir.list()) {
-                                if (entity is File && entity.path.endsWith('.log')) {
-                                  await entity.delete();
-                                }
-                              }
-                            }
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('日志文件已清空')),
-                              );
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('清空日志失败: $e')),
-                              );
-                            }
-                          }
-                        }
-                      },
-                      icon: const Icon(Icons.delete_outline, size: 16),
-                      label: const Text('清空日志文件'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        textStyle: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             const Divider(height: 40),
             const Text('证书管理', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
