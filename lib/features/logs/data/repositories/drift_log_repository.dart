@@ -9,13 +9,13 @@ import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart'
 
 class DriftLogRepository implements LogRepository {
   final AppDatabase _db;
-  final StreamController<void> _changeController =
-      StreamController<void>.broadcast();
+  final StreamController<LogChangeEvent> _changeController =
+      StreamController<LogChangeEvent>.broadcast();
 
   DriftLogRepository(this._db);
 
   @override
-  Stream<void> get changeStream => _changeController.stream;
+  Stream<LogChangeEvent> get changeStream => _changeController.stream;
 
   @override
   Future<int> get logCount async =>
@@ -272,7 +272,7 @@ class DriftLogRepository implements LogRepository {
   @override
   Future<int> addLog(LogEntry log) async {
     final id = await _db.into(_db.proxyLogs).insert(_entryToRow(log));
-    _changeController.add(null);
+    _changeController.add(LogAddedEvent(id));
     return id;
   }
 
@@ -281,25 +281,25 @@ class DriftLogRepository implements LogRepository {
     await (_db.update(_db.proxyLogs)
           ..where((t) => t.id.equals(updatedLog.id)))
         .write(_entryToRow(updatedLog));
-    _changeController.add(null);
+    _changeController.add(LogUpdatedEvent(updatedLog.id));
   }
 
   @override
   Future<void> clearLogs() async {
     await _db.delete(_db.proxyLogs).go();
-    _changeController.add(null);
+    _changeController.add(const LogClearedEvent());
   }
 
   @override
   Future<void> deleteLog(int id) async {
     await (_db.delete(_db.proxyLogs)..where((t) => t.id.equals(id))).go();
-    _changeController.add(null);
+    _changeController.add(LogDeletedEvent([id]));
   }
 
   @override
   Future<void> deleteLogs(List<int> ids) async {
     if (ids.isEmpty) return;
     await (_db.delete(_db.proxyLogs)..where((t) => t.id.isIn(ids))).go();
-    _changeController.add(null);
+    _changeController.add(LogDeletedEvent(ids));
   }
 }

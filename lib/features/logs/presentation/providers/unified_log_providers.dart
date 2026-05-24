@@ -141,7 +141,7 @@ class UnifiedLogState {
 }
 
 class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
-  StreamSubscription<void>? _changeSub;
+  StreamSubscription<LogChangeEvent>? _changeSub;
   LogRepository get _repo => ref.read(logRepositoryProvider);
 
   static const int _pageSize = 100;
@@ -149,9 +149,89 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
   @override
   UnifiedLogState build() {
     _loadInitial();
-    _changeSub = _repo.changeStream.listen((_) => _reloadAll());
+    _changeSub = _repo.changeStream.listen(_handleChangeEvent);
     ref.onDispose(() => _changeSub?.cancel());
     return const UnifiedLogState(isLoading: true);
+  }
+
+  void _handleChangeEvent(LogChangeEvent event) {
+    switch (event) {
+      case LogAddedEvent e:
+        _handleLogAdded(e.id);
+      case LogUpdatedEvent e:
+        _handleLogUpdated(e.id);
+      case LogDeletedEvent e:
+        _handleLogDeleted(e.ids);
+      case LogClearedEvent():
+        _reloadAll();
+    }
+  }
+
+  Future<void> _handleLogAdded(int newId) async {
+    if (state.isLoading) {
+      _reloadAll();
+      return;
+    }
+    try {
+      final newLog = await _repo.getLog(newId);
+      if (newLog == null) {
+        _reloadAll();
+        return;
+      }
+      final s = state;
+      final entries = s.allEntries;
+      if (entries.any((e) => e.id == newId)) {
+        _handleLogUpdated(newId);
+        return;
+      }
+      state = state.copyWith(
+        allEntries: [newLog, ...entries],
+        hasMore: true,
+        clearError: true,
+      );
+      _rebuildDisplay();
+      _computeStats();
+    } catch (_) {
+      _reloadAll();
+    }
+  }
+
+  Future<void> _handleLogUpdated(int updatedId) async {
+    if (state.isLoading) {
+      _reloadAll();
+      return;
+    }
+    try {
+      final updatedLog = await _repo.getLog(updatedId);
+      if (updatedLog == null) {
+        _handleLogDeleted([updatedId]);
+        return;
+      }
+      final s = state;
+      final entries = s.allEntries;
+      final idx = entries.indexWhere((e) => e.id == updatedId);
+      if (idx == -1) {
+        _handleLogAdded(updatedId);
+        return;
+      }
+      final newEntries = [...entries];
+      newEntries[idx] = updatedLog;
+      state = state.copyWith(allEntries: newEntries);
+      _rebuildDisplay();
+      _computeStats();
+    } catch (_) {
+      _reloadAll();
+    }
+  }
+
+  void _handleLogDeleted(List<int> deletedIds) {
+    if (state.isLoading) return;
+    final s = state;
+    final idsSet = deletedIds.toSet();
+    final newEntries = s.allEntries.where((e) => !idsSet.contains(e.id)).toList();
+    state = state.copyWith(allEntries: newEntries);
+    _rebuildDisplay();
+    _computeStats();
   }
 
   /// 根据当前 allEntries / filter / range / reversed 重建 displayEntries 缓存
@@ -279,6 +359,17 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
     state = state.copyWith(clearRange: true);
     _rebuildDisplay();
     _computeStats();
+  }
+
+  void clearMemory() {
+    state = state.copyWith(
+      allEntries: const [],
+      displayEntries: const [],
+      stats: null,
+      hasMore: true,
+      clearRange: true,
+      clearError: true,
+    );
   }
 
   Future<void> deleteFilteredLogs() async {

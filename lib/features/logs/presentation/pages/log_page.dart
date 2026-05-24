@@ -21,30 +21,11 @@ class LogPage extends ConsumerStatefulWidget {
 class _UnifiedLogPageState extends ConsumerState<LogPage> {
   final ScrollController _scrollController = ScrollController();
 
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      ref.read(unifiedLogProvider.notifier).loadMore();
-    }
-  }
+  UnifiedLogNotifier get _notifier => ref.read(unifiedLogProvider.notifier);
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(unifiedLogProvider);
-    final notifier = ref.read(unifiedLogProvider.notifier);
     final hasFilter = !state.filter.isEmpty;
 
     return Scaffold(
@@ -71,7 +52,7 @@ class _UnifiedLogPageState extends ConsumerState<LogPage> {
               ),
               tooltip: state.reversed ? '切换为正序' : '切换为倒序',
               onPressed: () {
-                notifier.setReversed(!state.reversed);
+                _notifier.setReversed(!state.reversed);
               },
             ),
             IconButton(
@@ -82,7 +63,7 @@ class _UnifiedLogPageState extends ConsumerState<LogPage> {
                   ? '速度已减去首字节时间'
                   : '速度包含首字节时间',
               onPressed: () {
-                notifier.setSubtractFirstByte(!state.subtractFirstByte);
+                _notifier.setSubtractFirstByte(!state.subtractFirstByte);
               },
             ),
             IconButton(
@@ -91,9 +72,14 @@ class _UnifiedLogPageState extends ConsumerState<LogPage> {
               onPressed: () => _exportLogs(state),
             ),
             IconButton(
+              icon: const Icon(Icons.clear_all),
+              tooltip: '清空显示',
+              onPressed: () => _notifier.clearMemory(),
+            ),
+            IconButton(
               icon: const Icon(Icons.delete_outline),
               tooltip: '清空日志',
-              onPressed: () => _confirmClear(state, notifier),
+              onPressed: () => _confirmClear(state),
             ),
           ],
         ],
@@ -167,9 +153,21 @@ class _UnifiedLogPageState extends ConsumerState<LogPage> {
               itemCount: displayEntries.length + (state.hasMore ? 1 : 0),
               itemBuilder: (context, index) {
                 if (index >= displayEntries.length) {
-                  return const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    child: Center(
+                      child: state.isLoadingMore
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : OutlinedButton.icon(
+                              icon: const Icon(Icons.expand_more, size: 18),
+                              label: const Text('加载更多'),
+                              onPressed: () => _notifier.loadMore(),
+                            ),
+                    ),
                   );
                 }
                 final item = displayEntries[index];
@@ -200,7 +198,7 @@ class _UnifiedLogPageState extends ConsumerState<LogPage> {
     );
   }
 
-  Future<void> _confirmClear(UnifiedLogState state, UnifiedLogNotifier notifier) async {
+  Future<void> _confirmClear(UnifiedLogState state) async {
     final filtered = state.filteredEntries;
     if (filtered.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -230,7 +228,7 @@ class _UnifiedLogPageState extends ConsumerState<LogPage> {
       ),
     );
     if (confirmed == true) {
-      await notifier.deleteFilteredLogs();
+      await _notifier.deleteFilteredLogs();
     }
   }
 
