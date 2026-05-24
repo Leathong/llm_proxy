@@ -6,7 +6,7 @@ import 'package:path/path.dart' as p;
 
 /// 代理请求/响应日志写入器。
 /// 按模型名（+ 可选的 endpoint ID）分文件写入日志目录。
-class LogFileWriter {
+class LogFileExporter {
   String? _logFileDir;
   bool _splitByEndpoint = true;
 

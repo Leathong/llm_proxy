@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:llm_proxy/features/logs/data/datasources/log_file_writer.dart';
+import 'package:llm_proxy/features/logs/data/datasources/log_file_exporter.dart';
 import 'package:llm_proxy/features/proxy/data/datasources/proxy_server_datasource.dart';
 import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
 import 'package:llm_proxy/features/logs/data/repositories/drift_log_repository.dart';
@@ -27,8 +27,8 @@ final requestForwarderProvider = Provider<RequestForwarder>((ref) {
   return RequestForwarder();
 });
 
-final logFileWriterProvider = Provider<LogFileWriter>((ref) {
-  return LogFileWriter();
+final logFileWriterProvider = Provider<LogFileExporter>((ref) {
+  return LogFileExporter();
 });
 
 final proxyServerDataSourceProvider = Provider<ProxyServerDataSource>((ref) {

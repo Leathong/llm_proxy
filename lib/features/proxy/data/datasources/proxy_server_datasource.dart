@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:llm_proxy/features/logs/data/datasources/log_file_writer.dart';
+import 'package:llm_proxy/features/logs/data/datasources/log_file_exporter.dart';
 import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
 import 'package:llm_proxy/features/proxy/domain/services/proxy_logger.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_forwarder.dart';
@@ -17,7 +17,7 @@ class ProxyServerDataSource {
   final RuleMatcher _ruleMatcher;
   final RequestTransformer _transformer;
   final RequestForwarder _forwarder;
-  final LogFileWriter _logWriter;
+  final LogFileExporter _logWriter;
   final LogRepository _logRepository;
   late final ProxyLogger _logger;
   late final RequestRouter _router;
@@ -26,7 +26,7 @@ class ProxyServerDataSource {
     required RuleMatcher ruleMatcher,
     required RequestTransformer transformer,
     required RequestForwarder forwarder,
-    required LogFileWriter logWriter,
+    required LogFileExporter logWriter,
     required LogRepository logRepository,
     required Future<List<Rule>> Function() getRules,
     void Function(String message)? onLog,
@@ -50,7 +50,7 @@ class ProxyServerDataSource {
     _logWriter.setLogFileDir(dir);
   }
 
-  LogFileWriter get logWriter => _logWriter;
+  LogFileExporter get logWriter => _logWriter;
 
   Future<void> start({int port = 8080, String? certPath, String? keyPath}) async {
     if (isRunning) return;

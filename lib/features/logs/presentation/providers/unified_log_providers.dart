@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:llm_proxy/features/logs/data/datasources/log_file_parser.dart';
-import 'package:llm_proxy/features/logs/data/datasources/log_file_writer.dart';
+import 'package:llm_proxy/features/logs/data/datasources/log_file_exporter.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_stats.dart';
@@ -378,8 +378,12 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
     await _repo.deleteLogs(ids);
   }
 
+  Future<void> clearAllLogs() async {
+    await _repo.clearLogs();
+  }
+
   Future<void> exportLogs(String dirPath) async {
-    final writer = LogFileWriter();
+    final writer = LogFileExporter();
     writer.setLogFileDir(dirPath);
     writer.setSplitByEndpoint(false);
 

@@ -76,10 +76,38 @@ class _UnifiedLogPageState extends ConsumerState<LogPage> {
               tooltip: '清空显示',
               onPressed: () => _notifier.clearMemory(),
             ),
-            IconButton(
+            PopupMenuButton<String>(
               icon: const Icon(Icons.delete_outline),
-              tooltip: '清空日志',
-              onPressed: () => _confirmClear(state),
+              tooltip: '删除日志',
+              onSelected: (value) {
+                if (value == 'filtered') {
+                  _confirmClear(state);
+                } else if (value == 'all') {
+                  _confirmClearAll();
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'filtered',
+                  child: ListTile(
+                    leading: const Icon(Icons.filter_list),
+                    title: const Text('删除过滤出的日志'),
+                    subtitle: Text('共 ${state.filteredEntries.length} 条'),
+                    contentPadding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'all',
+                  child: ListTile(
+                    leading: const Icon(Icons.delete_forever),
+                    title: const Text('清空全部日志'),
+                    subtitle: Text('共 ${state.allEntries.length} 条'),
+                    contentPadding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
             ),
           ],
         ],
@@ -229,6 +257,29 @@ class _UnifiedLogPageState extends ConsumerState<LogPage> {
     );
     if (confirmed == true) {
       await _notifier.deleteFilteredLogs();
+    }
+  }
+
+  Future<void> _confirmClearAll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('清空全部日志'),
+        content: const Text('确定要清空全部日志记录吗？此操作不可撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('清空'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _notifier.clearAllLogs();
     }
   }
 
