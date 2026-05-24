@@ -114,6 +114,12 @@ class RequestForwarder {
         }
       });
 
+      // 允许跨域访问
+      clientRequest.response.headers.set('Access-Control-Allow-Origin', '*');
+      clientRequest.response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+      clientRequest.response.headers.set('Access-Control-Allow-Headers', '*');
+      clientRequest.response.headers.set('Access-Control-Expose-Headers', '*');
+
       // 流式转发：逐块读取上游响应并立即回写给客户端
       final responseBodyBuf = StringBuffer();
       int? firstByteMs;
