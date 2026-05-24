@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:llm_proxy/features/logs/data/datasources/log_file_exporter.dart';
 import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
+import 'package:llm_proxy/features/proxy/domain/entities/active_request_info.dart';
 import 'package:llm_proxy/features/proxy/domain/services/proxy_logger.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_forwarder.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_router.dart';
@@ -29,6 +30,8 @@ class ProxyServerDataSource {
     required LogFileExporter logWriter,
     required LogRepository logRepository,
     required RuleRepository ruleRepository,
+    void Function(ActiveRequestInfo)? onRequestStart,
+    void Function(int logId)? onRequestComplete,
     void Function(String message)? onLog,
   })  : _ruleMatcher = ruleMatcher,
         _transformer = transformer,
@@ -43,6 +46,8 @@ class ProxyServerDataSource {
       transformer: _transformer,
       forwarder: _forwarder,
       logRepository: _logRepository,
+      onRequestStart: onRequestStart,
+      onRequestComplete: onRequestComplete,
     );
   }
 

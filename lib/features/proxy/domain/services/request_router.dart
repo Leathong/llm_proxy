@@ -8,6 +8,7 @@ import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
 import 'package:llm_proxy/features/logs/domain/services/sse_parser.dart';
+import 'package:llm_proxy/features/proxy/domain/entities/active_request_info.dart';
 import 'package:llm_proxy/features/proxy/domain/services/proxy_logger.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_forwarder.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_transformer.dart';
@@ -27,6 +28,8 @@ class RequestRouter {
   final RequestTransformer transformer;
   final RequestForwarder forwarder;
   final LogRepository logRepository;
+  final void Function(ActiveRequestInfo)? onRequestStart;
+  final void Function(int logId)? onRequestComplete;
 
   final StreamController<LogEntry> _logWriteController =
       StreamController<LogEntry>.broadcast();
@@ -39,6 +42,8 @@ class RequestRouter {
     required this.transformer,
     required this.forwarder,
     required this.logRepository,
+    this.onRequestStart,
+    this.onRequestComplete,
   }) {
     _logWriteSub = _logWriteController.stream
         .listen((entry) => logRepository.addLog(entry));
@@ -171,6 +176,15 @@ class RequestRouter {
       ));
       // pending 日志需要同步写入以确保 logId 可用，后续 update 可异步
 
+      onRequestStart?.call(ActiveRequestInfo(
+        logId: logId,
+        model: requestedModelId,
+        path: request.uri.path,
+        startTime: startTime,
+        method: request.method,
+        clientRequest: request,
+      ));
+
       final allRules = await ruleRepository.getRules();
       final matchResult = ruleMatcher.match(allRules, requestedModelId);
 
@@ -198,6 +212,7 @@ class RequestRouter {
           statusCode: statusCode, status: LogStatus.error, error: errorMsg,
           requestDurationMs: duration,
         )));
+        onRequestComplete?.call(logId);
         return;
       }
 
@@ -230,6 +245,7 @@ class RequestRouter {
           firstByteDurationMs: result.firstByteMs,
           requestDurationMs: duration,
         )));
+        onRequestComplete?.call(logId);
         return;
       }
 
@@ -300,6 +316,7 @@ class RequestRouter {
       );
 
       unawaited(logRepository.updateLog(updatedEntry));
+      onRequestComplete?.call(logId);
     } catch (e) {
       logger.log('处理请求出错: $e');
       final duration = DateTime.now().difference(startTime).inMilliseconds;
@@ -310,6 +327,7 @@ class RequestRouter {
           status: LogStatus.error, error: e.toString(),
           requestDurationMs: duration,
         )));
+        onRequestComplete?.call(logId);
       }
       try {
         request.response.statusCode = HttpStatus.internalServerError;

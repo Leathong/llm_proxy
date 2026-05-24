@@ -7,6 +7,7 @@ import 'package:llm_proxy/features/logs/data/repositories/drift_log_repository.d
 import 'package:llm_proxy/features/proxy/domain/services/request_forwarder.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_transformer.dart';
 import 'package:llm_proxy/features/proxy/domain/services/rule_matcher.dart';
+import 'package:llm_proxy/features/proxy/presentation/providers/active_requests_providers.dart';
 import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.dart';
 import 'package:llm_proxy/features/settings/presentation/providers/settings_providers.dart';
 
@@ -38,6 +39,7 @@ final proxyServerDataSourceProvider = Provider<ProxyServerDataSource>((ref) {
   final forwarder = ref.read(requestForwarderProvider);
   final logWriter = ref.read(logFileWriterProvider);
   final ruleRepo = ref.read(ruleRepositoryProvider);
+  final activeNotifier = ref.read(activeRequestsProvider.notifier);
   return ProxyServerDataSource(
     ruleMatcher: ruleMatcher,
     transformer: transformer,
@@ -45,6 +47,8 @@ final proxyServerDataSourceProvider = Provider<ProxyServerDataSource>((ref) {
     logWriter: logWriter,
     logRepository: logRepo,
     ruleRepository: ruleRepo,
+    onRequestStart: (info) => activeNotifier.register(info),
+    onRequestComplete: (logId) => activeNotifier.unregister(logId),
     onLog: (msg) => debugPrint('[ProxyServer] $msg'),
   );
 });
@@ -80,6 +84,7 @@ class ProxyNotifier extends Notifier<ProxyState> {
 
     if (state.isRunning) {
       await dataSource.stop();
+      ref.read(activeRequestsProvider.notifier).clearAll();
       state = state.copyWith(isRunning: false);
     } else {
       state = state.copyWith(isLoading: true, error: null);
