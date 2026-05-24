@@ -5,10 +5,13 @@ import 'package:intl/intl.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_stats.dart';
+import 'package:llm_proxy/features/logs/domain/entities/log_storage_stats.dart';
 import 'package:llm_proxy/features/logs/presentation/providers/log_providers.dart';
+import 'package:llm_proxy/features/proxy/presentation/providers/proxy_providers.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_filter_dialog.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_item.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_range_dialog.dart';
+import 'package:llm_proxy/features/logs/presentation/widgets/log_storage_stats_dialog.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_summary_bar.dart';
 
 class LogPage extends ConsumerStatefulWidget {
@@ -37,7 +40,24 @@ class _LogPageState extends ConsumerState<LogPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('日志'),
+        title: Row(
+          children: [
+            const Text('日志'),
+            const SizedBox(width: 4),
+            InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => _showStorageStatsDialog(),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  Icons.info_outline,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.file_upload),
@@ -370,6 +390,26 @@ class _LogPageState extends ConsumerState<LogPage> {
     showDialog(
       context: context,
       builder: (_) => LogRangeDialog(state: state),
+    );
+  }
+
+  Future<void> _showStorageStatsDialog() async {
+    final repo = ref.read(logRepositoryProvider);
+    LogStorageStats stats;
+    try {
+      stats = await repo.storageStats;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('加载存储统计信息失败: $e')),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (_) => LogStorageStatsDialog(stats: stats),
     );
   }
 }

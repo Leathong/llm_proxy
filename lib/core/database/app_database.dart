@@ -116,6 +116,8 @@ class AppDatabase extends _$AppDatabase {
 
   AppDatabase.forTesting(super.e);
 
+  String get databaseFilePath => _dbFilePath;
+
   @override
   int get schemaVersion => 6;
 
@@ -231,10 +233,13 @@ class AppDatabase extends _$AppDatabase {
       );
 }
 
+String _dbFilePath = '';
+
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationSupportDirectory();
     final file = File(p.join(dbFolder.path, 'llm_proxy.sqlite'));
+    _dbFilePath = file.path;
 
     if (Platform.isMacOS || Platform.isIOS) {
       final cacheDir = await getTemporaryDirectory();

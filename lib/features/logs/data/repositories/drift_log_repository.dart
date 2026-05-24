@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/drift.dart' as drift;
 import 'package:llm_proxy/core/database/app_database.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
+import 'package:llm_proxy/features/logs/domain/entities/log_storage_stats.dart';
 import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
 
 class DriftLogRepository implements LogRepository {
@@ -301,5 +303,48 @@ class DriftLogRepository implements LogRepository {
     if (ids.isEmpty) return;
     await (_db.delete(_db.proxyLogs)..where((t) => t.id.isIn(ids))).go();
     _changeController.add(LogDeletedEvent(ids));
+  }
+
+  @override
+  Future<LogStorageStats> get storageStats async {
+    final count = await logCount;
+
+    DateTime? minTime;
+    DateTime? maxTime;
+    final timeRow = await _db.customSelect(
+      'SELECT MIN(time) AS min_t, MAX(time) AS max_t FROM proxy_logs',
+    ).getSingle();
+    final minT = timeRow.read<int?>('min_t');
+    final maxT = timeRow.read<int?>('max_t');
+    if (minT != null) minTime = DateTime.fromMillisecondsSinceEpoch(minT);
+    if (maxT != null) maxTime = DateTime.fromMillisecondsSinceEpoch(maxT);
+
+    int logTableBytes;
+    try {
+      final logTableRow = await _db.customSelect(
+        "SELECT IFNULL(SUM(pgsize), 0) AS total_bytes FROM dbstat WHERE name = 'proxy_logs'",
+      ).getSingle();
+      logTableBytes = logTableRow.read<int>('total_bytes');
+    } catch (_) {
+      logTableBytes = 0;
+    }
+
+    final dbFile = File(_db.databaseFilePath);
+    final databaseFileBytes = await dbFile.length();
+
+    int? walFileBytes;
+    final walFile = File('${_db.databaseFilePath}-wal');
+    if (await walFile.exists()) {
+      walFileBytes = await walFile.length();
+    }
+
+    return LogStorageStats(
+      totalCount: count,
+      minTime: minTime,
+      maxTime: maxTime,
+      logTableBytes: logTableBytes,
+      databaseFileBytes: databaseFileBytes,
+      walFileBytes: walFileBytes,
+    );
   }
 }

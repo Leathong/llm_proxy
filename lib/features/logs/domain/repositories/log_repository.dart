@@ -1,4 +1,5 @@
 import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
+import 'package:llm_proxy/features/logs/domain/entities/log_storage_stats.dart';
 
 /// 日志变更事件，用于增量更新
 sealed class LogChangeEvent {
@@ -55,4 +56,6 @@ abstract class LogRepository {
   Future<void> clearLogs();
   Future<void> deleteLog(int id);
   Future<void> deleteLogs(List<int> ids);
+
+  Future<LogStorageStats> get storageStats;
 }

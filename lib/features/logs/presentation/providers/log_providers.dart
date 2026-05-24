@@ -287,6 +287,17 @@ class LogNotifier extends Notifier<LogState> {
     if (s.isLoadingMore || !s.hasMore) return;
     state = state.copyWith(isLoadingMore: true);
     try {
+      if (s.allEntries.isEmpty) {
+        final entries = await _repo.getLogs(limit: s.pageSize, desc: true);
+        state = state.copyWith(
+          allEntries: entries,
+          isLoadingMore: false,
+          hasMore: entries.length >= s.pageSize,
+        );
+        _rebuildDisplay();
+        _computeStats();
+        return;
+      }
       final pageSize = s.pageSize;
       final lastId = s.allEntries.last.id;
       final more = await _repo.getLogs(
