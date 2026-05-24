@@ -19,7 +19,8 @@ class DriftLogRepository implements LogRepository {
 
   @override
   Future<int> get logCount async =>
-      (await _db.select(_db.proxyLogs).get()).length;
+      (await _db.customSelect('SELECT COUNT(*) AS cnt FROM proxy_logs').getSingle())
+          .read<int>('cnt');
 
   ProxyLogsCompanion _entryToRow(LogEntry e) {
     return ProxyLogsCompanion(

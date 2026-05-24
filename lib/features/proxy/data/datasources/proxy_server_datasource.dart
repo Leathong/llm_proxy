@@ -14,22 +14,28 @@ class ProxyServerDataSource {
   bool get isRunning => _server != null;
   int _port = 8080;
 
-  final RuleMatcher _ruleMatcher = RuleMatcher();
-  final RequestTransformer _transformer = RequestTransformer();
-  final RequestForwarder _forwarder = RequestForwarder();
-  final LogFileWriter _logWriter = LogFileWriter();
+  final RuleMatcher _ruleMatcher;
+  final RequestTransformer _transformer;
+  final RequestForwarder _forwarder;
+  final LogFileWriter _logWriter;
   final LogRepository _logRepository;
   late final ProxyLogger _logger;
   late final RequestRouter _router;
 
   ProxyServerDataSource({
-    required Future<List<Rule>> Function() getRules,
+    required RuleMatcher ruleMatcher,
+    required RequestTransformer transformer,
+    required RequestForwarder forwarder,
+    required LogFileWriter logWriter,
     required LogRepository logRepository,
+    required Future<List<Rule>> Function() getRules,
     void Function(String message)? onLog,
-  }) : _logRepository = logRepository {
-    _logger = ProxyLogger(
-      onLog: onLog,
-    );
+  })  : _ruleMatcher = ruleMatcher,
+        _transformer = transformer,
+        _forwarder = forwarder,
+        _logWriter = logWriter,
+        _logRepository = logRepository {
+    _logger = ProxyLogger(onLog: onLog);
     _router = RequestRouter(
       getRules: getRules,
       logger: _logger,

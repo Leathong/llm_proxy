@@ -6,6 +6,7 @@ import 'package:llm_proxy/features/logs/data/datasources/log_response_parser.dar
 import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
+import 'package:llm_proxy/features/logs/domain/services/sse_parser.dart';
 import 'package:llm_proxy/features/proxy/domain/services/proxy_logger.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_forwarder.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_transformer.dart';
@@ -15,8 +16,8 @@ import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
 Map<String, dynamic> _parseRequestBodyIsolate(String rawJson) =>
     LogResponseParser.parseRequestBody(rawJson);
 
-Map<String, dynamic> _parseResponseBodyIsolate(Map<String, String> params) =>
-    LogResponseParser.parseResponseBody(params['body']!, params['path']!);
+SseParseResult _parseResponseBodyIsolate(Map<String, String> params) =>
+    SseParser.parseResponse(params['body']!, params['path']!);
 
 class RequestRouter {
   final Future<List<Rule>> Function() getRules;
@@ -226,7 +227,7 @@ class RequestRouter {
       });
 
       final parsedReqMap = await parsedReqFuture;
-      final parsedRespMap = await parsedRespFuture;
+      final parsedRespResult = await parsedRespFuture;
 
       FileLogRequest? parsedReq;
       if (parsedReqMap.isNotEmpty && parsedReqMap['model'] != null) {
@@ -248,23 +249,21 @@ class RequestRouter {
       }
 
       FileLogResponse? parsedResp;
-      if (parsedRespMap.isNotEmpty && parsedRespMap['type'] != null) {
+      if (parsedRespResult.type != null && parsedRespResult.type != 'empty' && parsedRespResult.type != 'raw') {
         FileLogUsage? usage;
-        if (parsedRespMap['usage'] is Map<String, dynamic>) {
-          usage = FileLogUsage.fromJson(
-              parsedRespMap['usage'] as Map<String, dynamic>);
+        if (parsedRespResult.usage != null) {
+          usage = FileLogUsage.fromJson(parsedRespResult.usage!);
         }
-        final content = (parsedRespMap['content'] as List?)
-            ?.map((c) =>
-                FileLogContentBlock.fromJson(c as Map<String, dynamic>))
+        final content = parsedRespResult.content
+            ?.map((c) => FileLogContentBlock.fromJson(c))
             .toList();
         parsedResp = FileLogResponse(
-          type: parsedRespMap['type'] as String?,
-          model: parsedRespMap['model'] as String?,
-          stopReason: parsedRespMap['stop_reason'] as String?,
+          type: parsedRespResult.type,
+          model: parsedRespResult.model,
+          stopReason: parsedRespResult.stopReason,
           usage: usage,
           content: content,
-          id: parsedRespMap['id'] as String?,
+          id: parsedRespResult.id,
         );
       }
 

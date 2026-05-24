@@ -1,8 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:llm_proxy/features/logs/data/datasources/log_file_writer.dart';
 import 'package:llm_proxy/features/proxy/data/datasources/proxy_server_datasource.dart';
 import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
 import 'package:llm_proxy/features/logs/data/repositories/drift_log_repository.dart';
+import 'package:llm_proxy/features/proxy/domain/services/request_forwarder.dart';
+import 'package:llm_proxy/features/proxy/domain/services/request_transformer.dart';
+import 'package:llm_proxy/features/proxy/domain/services/rule_matcher.dart';
 import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.dart';
 import 'package:llm_proxy/features/settings/presentation/providers/settings_providers.dart';
 
@@ -11,11 +15,35 @@ final logRepositoryProvider = Provider<LogRepository>((ref) {
   return DriftLogRepository(db);
 });
 
+final ruleMatcherProvider = Provider<RuleMatcher>((ref) {
+  return RuleMatcher();
+});
+
+final requestTransformerProvider = Provider<RequestTransformer>((ref) {
+  return RequestTransformer();
+});
+
+final requestForwarderProvider = Provider<RequestForwarder>((ref) {
+  return RequestForwarder();
+});
+
+final logFileWriterProvider = Provider<LogFileWriter>((ref) {
+  return LogFileWriter();
+});
+
 final proxyServerDataSourceProvider = Provider<ProxyServerDataSource>((ref) {
   final logRepo = ref.read(logRepositoryProvider);
+  final ruleMatcher = ref.read(ruleMatcherProvider);
+  final transformer = ref.read(requestTransformerProvider);
+  final forwarder = ref.read(requestForwarderProvider);
+  final logWriter = ref.read(logFileWriterProvider);
   return ProxyServerDataSource(
-    getRules: () => ref.read(ruleRepositoryProvider).getRules(),
+    ruleMatcher: ruleMatcher,
+    transformer: transformer,
+    forwarder: forwarder,
+    logWriter: logWriter,
     logRepository: logRepo,
+    getRules: () => ref.read(ruleRepositoryProvider).getRules(),
     onLog: (msg) => debugPrint('[ProxyServer] $msg'),
   );
 });
