@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 /// 代理请求/响应日志写入器。
 /// 按模型名（+ 可选的 endpoint ID）分文件写入日志目录。
 class LogFileWriter {
@@ -77,9 +79,9 @@ class LogFileWriter {
     final safeModel = _safeFileName(model ?? '_models');
     if (_splitByEndpoint) {
       final epId = endpointId?.toString() ?? '_unknown';
-      return '$_logFileDir${safeModel}_$epId.log';
+      return p.join(_logFileDir!, '${safeModel}_$epId.log');
     }
-    return '$_logFileDir$safeModel.log';
+    return p.join(_logFileDir!, '$safeModel.log');
   }
 
   /// 文件名安全处理：替换非法字符，截断过长名称
