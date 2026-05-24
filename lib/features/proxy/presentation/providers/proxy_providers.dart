@@ -37,13 +37,14 @@ final proxyServerDataSourceProvider = Provider<ProxyServerDataSource>((ref) {
   final transformer = ref.read(requestTransformerProvider);
   final forwarder = ref.read(requestForwarderProvider);
   final logWriter = ref.read(logFileWriterProvider);
+  final ruleRepo = ref.read(ruleRepositoryProvider);
   return ProxyServerDataSource(
     ruleMatcher: ruleMatcher,
     transformer: transformer,
     forwarder: forwarder,
     logWriter: logWriter,
     logRepository: logRepo,
-    getRules: () => ref.read(ruleRepositoryProvider).getRules(),
+    ruleRepository: ruleRepo,
     onLog: (msg) => debugPrint('[ProxyServer] $msg'),
   );
 });

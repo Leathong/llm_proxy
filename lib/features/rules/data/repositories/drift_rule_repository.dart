@@ -11,35 +11,63 @@ class DriftRuleRepository implements RuleRepository {
   final db.AppDatabase _db;
   final SharedPreferences _prefs;
 
+  /// 内存缓存，避免每次代理请求都查询数据库
+  List<entity.Rule>? _cachedRules;
+
   DriftRuleRepository(this._db, this._prefs);
+
+  /// 使缓存失效，在增删改操作后调用
+  void _invalidateCache() {
+    _cachedRules = null;
+  }
 
   @override
   Future<List<entity.Rule>> getRules() async {
+    if (_cachedRules != null) return _cachedRules!;
+
     final rules = await _db.select(_db.rules).get();
-    final result = <entity.Rule>[];
+    if (rules.isEmpty) {
+      _cachedRules = [];
+      return _cachedRules!;
+    }
 
-    for (final rule in rules) {
-      final joins = await (_db.select(_db.ruleEndpoints)
-            ..where((re) => re.ruleId.equals(rule.id))
-            ..orderBy([(re) => OrderingTerm.asc(re.sortOrder)]))
+    final ruleIds = rules.map((r) => r.id).toList();
+
+    final joins = await (_db.select(_db.ruleEndpoints)
+          ..where((re) => re.ruleId.isIn(ruleIds))
+          ..orderBy([(re) => OrderingTerm.asc(re.sortOrder)]))
+        .get();
+
+    final endpointIds = joins.map((j) => j.endpointId).toSet().toList();
+
+    final endpointsMap = <int, db.Endpoint>{};
+    if (endpointIds.isNotEmpty) {
+      final eps = await (_db.select(_db.endpoints)
+            ..where((e) => e.id.isIn(endpointIds)))
           .get();
-
-      final endpoints = <EndpointConfig>[];
-      for (final join in joins) {
-        final ep = await (_db.select(_db.endpoints)
-              ..where((e) => e.id.equals(join.endpointId)))
-            .getSingleOrNull();
-        if (ep != null) {
-          endpoints.add(EndpointConfig(
-            id: ep.id,
-            url: ep.url,
-            apiKey: ep.apiKey,
-            active: join.active,
-          ));
-        }
+      for (final ep in eps) {
+        endpointsMap[ep.id] = ep;
       }
+    }
 
-      result.add(entity.Rule(
+    final joinsByRule = <int, List<db.RuleEndpoint>>{};
+    for (final j in joins) {
+      joinsByRule.putIfAbsent(j.ruleId, () => []).add(j);
+    }
+
+    _cachedRules = rules.map((rule) {
+      final ruleJoins = joinsByRule[rule.id] ?? [];
+      final endpoints = ruleJoins.map((j) {
+        final ep = endpointsMap[j.endpointId];
+        return EndpointConfig(
+          id: j.endpointId,
+          url: ep?.url ?? '',
+          apiKey: ep?.apiKey ?? '',
+          active: j.active,
+        );
+      }).toList();
+
+      return entity.Rule(
         id: rule.id,
         name: rule.name,
         groupName: rule.groupName,
@@ -50,15 +78,16 @@ class DriftRuleRepository implements RuleRepository {
         thinkingMode: rule.thinkingMode,
         reasoningEffort: rule.reasoningEffort,
         convertThinkingToContent: rule.convertThinkingToContent,
-      ));
-    }
+      );
+    }).toList();
 
-    return result;
+    return _cachedRules!;
   }
 
   @override
   Future<entity.Rule> addRule(
       entity.Rule rule, List<EndpointConfig> endpoints) async {
+    _invalidateCache();
     return _db.transaction(() async {
       final ruleId = await _db.into(_db.rules).insert(db.RulesCompanion.insert(
             name: rule.name,
@@ -128,6 +157,7 @@ class DriftRuleRepository implements RuleRepository {
   @override
   Future<void> updateRule(
       entity.Rule rule, List<EndpointConfig> endpoints) async {
+    _invalidateCache();
     await _db.transaction(() async {
       await (_db.update(_db.rules)..where((r) => r.id.equals(rule.id))).write(
         db.RulesCompanion(
@@ -181,11 +211,13 @@ class DriftRuleRepository implements RuleRepository {
 
   @override
   Future<void> deleteRule(int id) async {
+    _invalidateCache();
     await (_db.delete(_db.rules)..where((r) => r.id.equals(id))).go();
   }
 
   @override
   Future<void> toggleRule(int id, bool active) async {
+    _invalidateCache();
     await (_db.update(_db.rules)..where((r) => r.id.equals(id)))
         .write(db.RulesCompanion(active: Value(active)));
   }

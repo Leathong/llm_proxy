@@ -12,7 +12,7 @@ import 'package:llm_proxy/features/proxy/domain/services/proxy_logger.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_forwarder.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_transformer.dart';
 import 'package:llm_proxy/features/proxy/domain/services/rule_matcher.dart';
-import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
+import 'package:llm_proxy/features/rules/domain/repositories/rule_repository.dart';
 
 Map<String, dynamic> _parseRequestBodyIsolate(String rawJson) =>
     LogResponseParser.parseRequestBody(rawJson);
@@ -21,7 +21,7 @@ SseParseResult _parseResponseBodyIsolate(Map<String, String> params) =>
     SseParser.parseResponse(params['body']!, params['path']!);
 
 class RequestRouter {
-  final Future<List<Rule>> Function() getRules;
+  final RuleRepository ruleRepository;
   final ProxyLogger logger;
   final RuleMatcher ruleMatcher;
   final RequestTransformer transformer;
@@ -33,7 +33,7 @@ class RequestRouter {
   StreamSubscription<LogEntry>? _logWriteSub;
 
   RequestRouter({
-    required this.getRules,
+    required this.ruleRepository,
     required this.logger,
     required this.ruleMatcher,
     required this.transformer,
@@ -91,7 +91,7 @@ class RequestRouter {
 
   Future<void> _handleModels(HttpRequest request) async {
     final startTime = DateTime.now();
-    final rules = (await getRules()).where((r) => r.active).toList();
+    final rules = (await ruleRepository.getRules()).where((r) => r.active).toList();
     final models = rules.map((r) => {
       'id': r.customModelId,
       'object': 'model',
@@ -171,7 +171,7 @@ class RequestRouter {
       ));
       // pending 日志需要同步写入以确保 logId 可用，后续 update 可异步
 
-      final allRules = await getRules();
+      final allRules = await ruleRepository.getRules();
       final matchResult = ruleMatcher.match(allRules, requestedModelId);
 
       if (matchResult == null) {

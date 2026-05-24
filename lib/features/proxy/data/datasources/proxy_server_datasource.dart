@@ -7,7 +7,7 @@ import 'package:llm_proxy/features/proxy/domain/services/request_forwarder.dart'
 import 'package:llm_proxy/features/proxy/domain/services/request_router.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_transformer.dart';
 import 'package:llm_proxy/features/proxy/domain/services/rule_matcher.dart';
-import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
+import 'package:llm_proxy/features/rules/domain/repositories/rule_repository.dart';
 
 class ProxyServerDataSource {
   HttpServer? _server;
@@ -28,7 +28,7 @@ class ProxyServerDataSource {
     required RequestForwarder forwarder,
     required LogFileExporter logWriter,
     required LogRepository logRepository,
-    required Future<List<Rule>> Function() getRules,
+    required RuleRepository ruleRepository,
     void Function(String message)? onLog,
   })  : _ruleMatcher = ruleMatcher,
         _transformer = transformer,
@@ -37,7 +37,7 @@ class ProxyServerDataSource {
         _logRepository = logRepository {
     _logger = ProxyLogger(onLog: onLog);
     _router = RequestRouter(
-      getRules: getRules,
+      ruleRepository: ruleRepository,
       logger: _logger,
       ruleMatcher: _ruleMatcher,
       transformer: _transformer,
