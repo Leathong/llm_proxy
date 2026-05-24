@@ -51,12 +51,28 @@ class RuleEndpoints extends Table {
   Set<Column> get primaryKey => {ruleId, endpointId};
 }
 
+/// 毫秒精度 DateTime <-> int 转换器
+class MillisDateTimeConverter extends TypeConverter<DateTime, int> {
+  const MillisDateTimeConverter();
+
+  @override
+  DateTime fromSql(int fromDb) {
+    return DateTime.fromMillisecondsSinceEpoch(fromDb);
+  }
+
+  @override
+  int toSql(DateTime value) {
+    return value.millisecondsSinceEpoch;
+  }
+}
+
 /// 代理请求/响应日志（统一存储实时日志与历史分析所需的所有字段）
 class ProxyLogs extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get method => text()();
   TextColumn get path => text()();
-  DateTimeColumn get time => dateTime()();
+  IntColumn get time =>
+      integer().map(const MillisDateTimeConverter())();
   TextColumn get model => text().nullable()();
   TextColumn get targetEndpoint => text().nullable()();
   IntColumn get statusCode => integer().nullable()();
@@ -97,7 +113,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -199,6 +215,12 @@ class AppDatabase extends _$AppDatabase {
             await customStatement('DROP TABLE proxy_logs');
             await customStatement(
               'ALTER TABLE proxy_logs_v5 RENAME TO proxy_logs',
+            );
+          }
+          if (from < 6) {
+            // 将 time 列从秒级时间戳转为毫秒级
+            await customStatement(
+              'UPDATE proxy_logs SET time = time * 1000 WHERE time < 100000000000',
             );
           }
         },

@@ -26,6 +26,11 @@ class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
       appBar: AppBar(
         title: const Text('日志'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.file_upload),
+            tooltip: '导入日志',
+            onPressed: () => _importLogs(),
+          ),
           if (state.allEntries.isNotEmpty) ...[
             IconButton(
               icon: Icon(
@@ -54,11 +59,6 @@ class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
               onPressed: () {
                 notifier.setSubtractFirstByte(!state.subtractFirstByte);
               },
-            ),
-            IconButton(
-              icon: const Icon(Icons.file_upload),
-              tooltip: '导入日志',
-              onPressed: () => _importLogs(),
             ),
             IconButton(
               icon: const Icon(Icons.file_download),
@@ -142,8 +142,11 @@ class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
           Expanded(
             child: ListView.builder(
               itemCount: displayEntries.length,
-              itemBuilder: (context, index) =>
-                  _LogItem(log: displayEntries[index]),
+              itemBuilder: (context, index) {
+                final log = displayEntries[index];
+                final seq = state.allEntries.indexOf(log) + 1;
+                return _LogItem(log: log, seq: seq);
+              },
             ),
           ),
       ],
@@ -563,7 +566,8 @@ class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
 
 class _LogItem extends StatelessWidget {
   final LogEntry log;
-  const _LogItem({required this.log});
+  final int seq;
+  const _LogItem({required this.log, required this.seq});
 
   @override
   Widget build(BuildContext context) {
@@ -595,6 +599,20 @@ class _LogItem extends StatelessWidget {
       child: ExpansionTile(
         title: Row(
           children: [
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text('$seq',
+                  style: const TextStyle(
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 11)),
+            ),
+            const SizedBox(width: 6),
             if (log.status == LogStatus.pending)
               Container(
                 padding:

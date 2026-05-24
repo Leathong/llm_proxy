@@ -217,9 +217,14 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
   LogEntry _fileLogEntryToLogEntry(FileLogEntry entry) {
     DateTime time;
     try {
-      time = DateFormat('yyyy-MM-dd HH:mm:ss').parse(entry.timestamp);
+      // 优先尝试带毫秒的格式，失败则回退到旧格式
+      time = DateFormat('yyyy-MM-dd HH:mm:ss.SSS').parse(entry.timestamp);
     } catch (_) {
-      time = DateTime.now();
+      try {
+        time = DateFormat('yyyy-MM-dd HH:mm:ss').parse(entry.timestamp);
+      } catch (_) {
+        time = DateTime.now();
+      }
     }
 
     return LogEntry(

@@ -93,7 +93,8 @@ class LogFileWriter {
 
   String _formatTime(DateTime dt) {
     return '${dt.year}-${_pad(dt.month)}-${_pad(dt.day)} '
-        '${_pad(dt.hour)}:${_pad(dt.minute)}:${_pad(dt.second)}';
+        '${_pad(dt.hour)}:${_pad(dt.minute)}:${_pad(dt.second)}.'
+        '${dt.millisecond.toString().padLeft(3, '0')}';
   }
 
   String _pad(int n) => n.toString().padLeft(2, '0');

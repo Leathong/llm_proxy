@@ -8,9 +8,10 @@ import 'package:llm_proxy/features/logs/domain/services/sse_parser.dart';
 /// 将 .log 文本文件解析为结构化的 [FileLogEntry] 列表。
 /// 支持 Anthropic 和 OpenAI 的 SSE 流式响应拼接。
 class LogFileParser {
-  // 匹配分隔线: -------------------- 2026-05-01 10:14:53 --------------------
+  // 匹配分隔线: -------------------- 2026-05-01 10:14:53.123 --------------------
+  // 兼容旧格式（无毫秒）
   static final _separatorRe = RegExp(
-    r'^-{20}\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+-{20}$',
+    r'^-{20}\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d{3})?)\s+-{20}$',
   );
 
   // 元数据行正则
