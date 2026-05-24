@@ -1,102 +1,45 @@
 import 'package:flutter/material.dart';
-import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
+import 'package:llm_proxy/features/logs/domain/entities/log_stats.dart';
 
 /// 顶部统计摘要栏
 class LogSummaryBar extends StatelessWidget {
-  final List<FileLogEntry> entries;
+  final LogStats stats;
   final String? filePath;
-  final bool subtractFirstByte;
 
-  /// 过滤后的条目（非空时以此为准计算统计）
-  final List<FileLogEntry>? filteredEntries;
+  /// 过滤后的统计（非空时以此为准显示范围信息）
+  final LogStats? filteredStats;
+  final bool subtractFirstByte;
   final int? rangeStart;
   final int? rangeEnd;
   final VoidCallback? onRangeTap;
 
   const LogSummaryBar({
     super.key,
-    required this.entries,
+    required this.stats,
     this.filePath,
-    this.filteredEntries,
+    this.filteredStats,
     required this.subtractFirstByte,
     this.rangeStart,
     this.rangeEnd,
     this.onRangeTap,
   });
 
-  /// 百分位计算，支持 int/double 混合列表
-  num _percentile(List<num> sorted, int p) {
-    if (sorted.isEmpty) return 0;
-    final idx = ((p / 100) * (sorted.length - 1)).round();
-    return sorted[idx];
-  }
-
-  /// 格式化毫秒为可读时长
-  String _formatDuration(int ms) {
-    if (ms >= 60000) return '${(ms / 60000).toStringAsFixed(2)}min';
-    if (ms >= 1000) return '${(ms / 1000).toStringAsFixed(2)}s';
-    return '${ms}ms';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final statsEntries = filteredEntries ?? entries;
+    final displayStats = filteredStats ?? stats;
 
-    final totalRequests = statsEntries.length;
-    int successCount = 0;
-    int totalInput = 0, totalOutput = 0;
-    int totalCacheCreation = 0, totalCacheRead = 0;
-    int entryWithUsage = 0;
-    int totalOutputWithTime = 0, totalGenerationMs = 0;
-    int totalDurationMs = 0;
-    final durations = <int>[];
-    final ttfbDurations = <int>[];
-    final outputSpeeds = <double>[];
-
-    // 单次遍历完成所有统计计算
-    for (final entry in statsEntries) {
-      final statusCode = entry.statusCode;
-      if (statusCode != null && statusCode >= 200 && statusCode < 300) successCount++;
-
-      final duration = entry.durationMs;
-      if (duration != null) {
-        durations.add(duration);
-        totalDurationMs += duration;
-      }
-
-      final ttfb = entry.firstByteMs;
-      if (ttfb != null) ttfbDurations.add(ttfb);
-
-      final usage = entry.response?.usage;
-      if (usage != null) {
-        totalInput += usage.totalInputTokens;
-        totalOutput += usage.outputTokens ?? 0;
-        totalCacheCreation += usage.cacheCreationInputTokens ?? 0;
-        totalCacheRead += usage.cacheReadInputTokens ?? 0;
-        entryWithUsage++;
-      }
-
-      final out = usage?.outputTokens;
-      final dur = entry.durationMs;
-      if (out != null && dur != null && dur > 0) {
-        final baseMs = subtractFirstByte && entry.firstByteMs != null ? dur - entry.firstByteMs! : dur;
-        if (baseMs > 0) {
-          totalOutputWithTime += out;
-          totalGenerationMs += baseMs;
-        }
-      }
-
-      final speed = entry.outputTokensPerSecond(subtractFirstByte: subtractFirstByte);
-      if (speed != null) outputSpeeds.add(speed);
-    }
-
-    final errorCount = totalRequests - successCount;
-    durations.sort();
-    final p90 = _percentile(durations, 90);
-    ttfbDurations.sort();
-    final ttfbP90 = _percentile(ttfbDurations, 90);
-    final avgSpeed = totalGenerationMs > 0 ? totalOutputWithTime / (totalGenerationMs / 1000.0) : null;
-    outputSpeeds.sort((a, b) => b.compareTo(a)); // 降序：从快到慢，last 即最慢
+    final totalRequests = displayStats.totalRequests;
+    final successCount = displayStats.successCount;
+    final errorCount = displayStats.errorCount;
+    final p90 = displayStats.p90Duration;
+    final totalDurationMs = displayStats.totalDurationMs;
+    final ttfbP90 = displayStats.ttfbP90;
+    final avgSpeed = displayStats.avgSpeed;
+    final totalInput = displayStats.totalInput;
+    final totalOutput = displayStats.totalOutput;
+    final totalCacheCreation = displayStats.totalCacheCreation;
+    final totalCacheRead = displayStats.totalCacheRead;
+    final entryWithUsage = displayStats.entryWithUsage;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -135,10 +78,10 @@ class LogSummaryBar extends StatelessWidget {
                     label: 'P90',
                     value: '${p90}ms',
                     color: Colors.orange,
-                    onTap: durations.isNotEmpty
+                    onTap: displayStats.durations.isNotEmpty
                         ? () => _showMetricStats(
                               context,
-                              sorted: durations,
+                              sorted: displayStats.durations,
                               title: '总耗时统计',
                               icon: Icons.timer_outlined,
                               iconColor: Colors.orange,
@@ -149,18 +92,18 @@ class LogSummaryBar extends StatelessWidget {
                   const SizedBox(width: 8),
                   _StatChip(
                     label: '总耗时',
-                    value: _formatDuration(totalDurationMs),
+                    value: displayStats.formatDuration(totalDurationMs),
                     color: Colors.indigo,
                   ),
                   const SizedBox(width: 8),
-                  if (ttfbDurations.isNotEmpty) ...[
+                  if (displayStats.ttfbDurations.isNotEmpty) ...[
                     _StatChip(
                       label: 'TTFB',
                       value: '${ttfbP90}ms',
                       color: Colors.teal,
                       onTap: () => _showMetricStats(
                         context,
-                        sorted: ttfbDurations,
+                        sorted: displayStats.ttfbDurations,
                         title: '首字节耗时 (TTFB)',
                         icon: Icons.timer_outlined,
                         iconColor: Colors.teal,
@@ -176,7 +119,7 @@ class LogSummaryBar extends StatelessWidget {
                       color: Colors.cyan,
                       onTap: () => _showMetricStats(
                         context,
-                        sorted: outputSpeeds,
+                        sorted: displayStats.outputSpeeds,
                         title: '输出 Token 速度',
                         icon: Icons.speed,
                         iconColor: Colors.cyan,
@@ -189,7 +132,7 @@ class LogSummaryBar extends StatelessWidget {
                   ],
                   _StatChip(
                     label: 'Tokens',
-                    value: '${_formatNumber(totalInput)} / ${_formatNumber(totalOutput)}',
+                    value: '${displayStats.formatNumber(totalInput)} / ${displayStats.formatNumber(totalOutput)}',
                     color: Colors.purple,
                     onTap: entryWithUsage > 0
                         ? () => _showTokenStats(
@@ -223,9 +166,9 @@ class LogSummaryBar extends StatelessWidget {
     num? avgOverride,
   }) {
     final max = sorted.last;
-    final p90 = _percentile(sorted, 90);
-    final p70 = _percentile(sorted, 70);
-    final p50 = _percentile(sorted, 50);
+    final p90 = stats.percentile(sorted, 90);
+    final p70 = stats.percentile(sorted, 70);
+    final p50 = stats.percentile(sorted, 50);
     final avg = avgOverride ?? (sorted.fold<num>(0, (s, v) => s + v) / sorted.length);
 
     showDialog(
@@ -376,12 +319,6 @@ class LogSummaryBar extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _formatNumber(int n) {
-    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
-    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
-    return '$n';
   }
 }
 

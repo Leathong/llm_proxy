@@ -6,6 +6,7 @@ import 'package:llm_proxy/features/logs/data/datasources/log_file_parser.dart';
 import 'package:llm_proxy/features/logs/data/datasources/log_file_writer.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
+import 'package:llm_proxy/features/logs/domain/entities/log_stats.dart';
 import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
 import 'package:llm_proxy/features/proxy/presentation/providers/proxy_providers.dart';
 
@@ -69,6 +70,7 @@ class UnifiedLogState {
   final int? rangeEnd;
   final bool reversed;
   final bool subtractFirstByte;
+  final LogStats? stats;
 
   const UnifiedLogState({
     this.allEntries = const [],
@@ -79,6 +81,7 @@ class UnifiedLogState {
     this.rangeEnd,
     this.reversed = false,
     this.subtractFirstByte = false,
+    this.stats,
   });
 
   UnifiedLogState copyWith({
@@ -90,8 +93,10 @@ class UnifiedLogState {
     int? rangeEnd,
     bool? reversed,
     bool? subtractFirstByte,
+    LogStats? stats,
     bool clearRange = false,
     bool clearError = false,
+    bool clearStats = false,
   }) {
     return UnifiedLogState(
       allEntries: allEntries ?? this.allEntries,
@@ -102,6 +107,7 @@ class UnifiedLogState {
       rangeEnd: clearRange ? null : (rangeEnd ?? this.rangeEnd),
       reversed: reversed ?? this.reversed,
       subtractFirstByte: subtractFirstByte ?? this.subtractFirstByte,
+      stats: clearStats ? null : (stats ?? this.stats),
     );
   }
 
@@ -140,17 +146,47 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
         isLoading: false,
         clearError: true,
       );
+      _computeStats();
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '加载日志失败: $e');
     }
   }
 
+  void _computeStats() {
+    final s = state;
+    final entries = _toFileLogEntries(s.filteredEntries);
+    final stats = LogStats.compute(entries, subtractFirstByte: s.subtractFirstByte);
+    state = state.copyWith(stats: stats);
+  }
+
+  List<FileLogEntry> _toFileLogEntries(List<LogEntry> entries) {
+    return entries.asMap().entries.map((e) {
+      final log = e.value;
+      return FileLogEntry(
+        timestamp: DateFormat('HH:mm:ss.SSS').format(log.time),
+        method: log.method,
+        path: log.path,
+        model: log.model,
+        forwardTo: log.targetEndpoint,
+        durationMs: log.requestDurationMs,
+        firstByteMs: log.firstByteDurationMs,
+        statusCode: log.statusCode,
+        request: log.parsedRequest,
+        response: log.parsedResponse,
+        index: e.key,
+      );
+    }).toList();
+  }
+
   void setReversed(bool v) => state = state.copyWith(reversed: v);
-  void setSubtractFirstByte(bool v) =>
-      state = state.copyWith(subtractFirstByte: v);
+  void setSubtractFirstByte(bool v) {
+    state = state.copyWith(subtractFirstByte: v);
+    _computeStats();
+  }
 
   void setFilter(UnifiedLogFilter filter) {
     state = state.copyWith(filter: filter);
+    _computeStats();
   }
 
   void setRange(int start, int end) {
@@ -158,10 +194,12 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
     final clampedStart = start.clamp(0, len);
     final clampedEnd = end.clamp(clampedStart, len);
     state = state.copyWith(rangeStart: clampedStart, rangeEnd: clampedEnd);
+    _computeStats();
   }
 
   void clearRange() {
     state = state.copyWith(clearRange: true);
+    _computeStats();
   }
 
   Future<void> deleteFilteredLogs() async {

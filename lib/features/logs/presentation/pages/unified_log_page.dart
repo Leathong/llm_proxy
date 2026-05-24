@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
+import 'package:llm_proxy/features/logs/domain/entities/log_stats.dart';
 import 'package:llm_proxy/features/logs/presentation/providers/unified_log_providers.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_detail.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_summary_bar.dart';
@@ -117,14 +118,14 @@ class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
     final displayEntries =
         state.reversed ? filtered.reversed.toList() : filtered;
 
+    final hasFilter = !state.filter.isEmpty || state.rangeStart != null;
+
     return Column(
       children: [
         LogSummaryBar(
-          entries: _toFileLogEntries(state.allEntries),
+          stats: state.stats ?? LogStats.compute([]),
           filePath: null,
-          filteredEntries: state.filter.isEmpty && state.rangeStart == null
-              ? null
-              : _toFileLogEntries(filtered),
+          filteredStats: hasFilter ? state.stats : null,
           subtractFirstByte: state.subtractFirstByte,
           rangeStart: state.rangeStart,
           rangeEnd: state.rangeEnd,
@@ -151,25 +152,6 @@ class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
           ),
       ],
     );
-  }
-
-  List<FileLogEntry> _toFileLogEntries(List<LogEntry> entries) {
-    return entries.asMap().entries.map((e) {
-      final log = e.value;
-      return FileLogEntry(
-        timestamp: DateFormat('HH:mm:ss.SSS').format(log.time),
-        method: log.method,
-        path: log.path,
-        model: log.model,
-        forwardTo: log.targetEndpoint,
-        durationMs: log.requestDurationMs,
-        firstByteMs: log.firstByteDurationMs,
-        statusCode: log.statusCode,
-        request: log.parsedRequest,
-        response: log.parsedResponse,
-        index: e.key,
-      );
-    }).toList();
   }
 
   Future<void> _confirmClear(UnifiedLogState state, UnifiedLogNotifier notifier) async {
