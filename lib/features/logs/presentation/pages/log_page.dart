@@ -9,14 +9,14 @@ import 'package:llm_proxy/features/logs/presentation/providers/unified_log_provi
 import 'package:llm_proxy/features/logs/presentation/widgets/log_detail.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_summary_bar.dart';
 
-class UnifiedLogPage extends ConsumerStatefulWidget {
-  const UnifiedLogPage({super.key});
+class LogPage extends ConsumerStatefulWidget {
+  const LogPage({super.key});
 
   @override
-  ConsumerState<UnifiedLogPage> createState() => _UnifiedLogPageState();
+  ConsumerState<LogPage> createState() => _UnifiedLogPageState();
 }
 
-class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
+class _UnifiedLogPageState extends ConsumerState<LogPage> {
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -391,7 +391,7 @@ class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
   }
 
   Future<void> _showRangeDialog(UnifiedLogState state) async {
-    final total = state.allEntries.length;
+    var total = state.allEntries.length;
     final curStart = state.rangeStart ?? 0;
     final curEnd = state.rangeEnd ?? total;
 
@@ -539,26 +539,49 @@ class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
                 ),
                 const SizedBox(height: 16),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    TextButton(
-                      onPressed: () {
-                        ref
-                            .read(unifiedLogProvider.notifier)
-                            .clearRange();
-                        Navigator.of(ctx).pop();
-                      },
-                      child: const Text('清除'),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: () {
-                        ref
-                            .read(unifiedLogProvider.notifier)
-                            .setRange(tempStart.toInt(), tempEnd.toInt());
-                        Navigator.of(ctx).pop();
-                      },
-                      child: const Text('应用'),
+                    if (state.hasMore)
+                      TextButton.icon(
+                        onPressed: () async {
+                          await ref.read(unifiedLogProvider.notifier).loadMore();
+                          final newState = ref.read(unifiedLogProvider);
+                          final newTotal = newState.allEntries.length;
+                          setDialogState(() {
+                            total = newTotal;
+                            if (tempEnd.toInt() > newTotal) {
+                              tempEnd = newTotal.toDouble();
+                              endCtrl.text = '$newTotal';
+                            }
+                          });
+                        },
+                        label: const Text('加载下一页'),
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            ref
+                                .read(unifiedLogProvider.notifier)
+                                .clearRange();
+                            Navigator.of(ctx).pop();
+                          },
+                          child: const Text('清除'),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: () {
+                            ref
+                                .read(unifiedLogProvider.notifier)
+                                .setRange(tempStart.toInt(), tempEnd.toInt());
+                            Navigator.of(ctx).pop();
+                          },
+                          child: const Text('应用'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
