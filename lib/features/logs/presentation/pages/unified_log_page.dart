@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 import 'package:llm_proxy/features/logs/presentation/providers/unified_log_providers.dart';
-import 'package:llm_proxy/features/logs/presentation/widgets/file_log_detail.dart';
+import 'package:llm_proxy/features/logs/presentation/widgets/log_detail.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_summary_bar.dart';
 
 class UnifiedLogPage extends ConsumerStatefulWidget {
@@ -707,7 +707,7 @@ class _LogDetailContent extends StatelessWidget {
         ],
         // 使用 FileLogDetail 展示解析后的请求/响应内容
         if (log.parsedRequest != null || log.parsedResponse != null)
-          FileLogDetail(
+          LogDetail(
             entry: FileLogEntry(
               timestamp: DateFormat('HH:mm:ss.SSS').format(log.time),
               method: log.method,

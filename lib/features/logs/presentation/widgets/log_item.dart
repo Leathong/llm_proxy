@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
-import 'package:llm_proxy/features/logs/presentation/widgets/file_log_detail.dart';
+import 'package:llm_proxy/features/logs/presentation/widgets/log_detail.dart';
 
 /// 单条日志条目，展开后点击空白区域可收起
-class FileLogItem extends StatefulWidget {
+class LogItem extends StatefulWidget {
   final FileLogEntry entry;
   final bool subtractFirstByte;
 
-  const FileLogItem({
+  const LogItem({
     super.key,
     required this.entry,
     required this.subtractFirstByte,
   });
 
   @override
-  State<FileLogItem> createState() => _FileLogItemState();
+  State<LogItem> createState() => _LogItemState();
 }
 
-class _FileLogItemState extends State<FileLogItem> {
+class _LogItemState extends State<LogItem> {
   final _controller = ExpansibleController();
   final _key = GlobalKey();
 
@@ -227,7 +227,7 @@ class _FileLogItemState extends State<FileLogItem> {
                 // 内部内容吸收点击，避免点击消息等内容时触发收起
                 child: GestureDetector(
                   onTap: () {},
-                  child: FileLogDetail(entry: entry),
+                  child: LogDetail(entry: entry),
                 ),
               ),
             ),
