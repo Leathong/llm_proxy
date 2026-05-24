@@ -76,6 +76,9 @@ class LogState {
   final LogStats? stats;
   final int pageSize;
 
+  /// 数据库中的总日志条数
+  final int totalCount;
+
   /// 缓存当前过滤/排序后的显示列表，每个元素携带在 allEntries 中的真实序号
   final List<({LogEntry entry, int seq})> displayEntries;
 
@@ -92,6 +95,7 @@ class LogState {
     this.subtractFirstByte = false,
     this.stats,
     this.pageSize = pageSizeConst,
+    this.totalCount = 0,
     this.displayEntries = const [],
   });
 
@@ -108,6 +112,7 @@ class LogState {
     bool? subtractFirstByte,
     LogStats? stats,
     int? pageSize,
+    int? totalCount,
     List<({LogEntry entry, int seq})>? displayEntries,
     bool clearRange = false,
     bool clearError = false,
@@ -126,6 +131,7 @@ class LogState {
       subtractFirstByte: subtractFirstByte ?? this.subtractFirstByte,
       stats: clearStats ? null : (stats ?? this.stats),
       pageSize: pageSize ?? this.pageSize,
+      totalCount: totalCount ?? this.totalCount,
       displayEntries: displayEntries ?? this.displayEntries,
     );
   }
@@ -193,6 +199,7 @@ class LogNotifier extends Notifier<LogState> {
       );
       _rebuildDisplay();
       _computeStats();
+      _loadTotalCount();
     } catch (_) {
       _reloadAll();
     }
@@ -234,6 +241,7 @@ class LogNotifier extends Notifier<LogState> {
     state = state.copyWith(allEntries: newEntries);
     _rebuildDisplay();
     _computeStats();
+    _loadTotalCount();
   }
 
   /// 根据当前 allEntries / filter / range / reversed 重建 displayEntries 缓存
@@ -250,6 +258,13 @@ class LogNotifier extends Notifier<LogState> {
     state = state.copyWith(displayEntries: display);
   }
 
+  Future<void> _loadTotalCount() async {
+    try {
+      final count = await _repo.logCount;
+      state = state.copyWith(totalCount: count);
+    } catch (_) {}
+  }
+
   Future<void> _loadInitial() async {
     try {
       final entries = await _repo.getLogs(limit: pageSizeConst, desc: true);
@@ -261,6 +276,7 @@ class LogNotifier extends Notifier<LogState> {
       );
       _rebuildDisplay();
       _computeStats();
+      _loadTotalCount();
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '加载日志失败: $e');
     }
@@ -301,6 +317,7 @@ class LogNotifier extends Notifier<LogState> {
       );
       _rebuildDisplay();
       _computeStats();
+      _loadTotalCount();
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '加载日志失败: $e');
     }
@@ -375,6 +392,7 @@ class LogNotifier extends Notifier<LogState> {
       displayEntries: const [],
       stats: null,
       hasMore: true,
+      totalCount: 0,
       clearRange: true,
       clearError: true,
     );

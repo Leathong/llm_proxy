@@ -153,6 +153,7 @@ class _LogPageState extends ConsumerState<LogPage> {
           subtractFirstByte: state.subtractFirstByte,
           rangeStart: state.rangeStart,
           rangeEnd: state.rangeEnd,
+          totalCount: state.totalCount,
           onRangeTap: () => _showRangeDialog(state),
         ),
         const Divider(height: 1),

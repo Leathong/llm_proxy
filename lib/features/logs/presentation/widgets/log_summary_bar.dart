@@ -13,6 +13,9 @@ class LogSummaryBar extends StatelessWidget {
   final int? rangeEnd;
   final VoidCallback? onRangeTap;
 
+  /// 数据库中的总日志条数
+  final int totalCount;
+
   const LogSummaryBar({
     super.key,
     required this.stats,
@@ -22,6 +25,7 @@ class LogSummaryBar extends StatelessWidget {
     this.rangeStart,
     this.rangeEnd,
     this.onRangeTap,
+    this.totalCount = 0,
   });
 
   @override
@@ -67,6 +71,8 @@ class LogSummaryBar extends StatelessWidget {
                     color: Colors.blueGrey,
                     onTap: onRangeTap,
                   ),
+                  const SizedBox(width: 8),
+                  _StatChip(label: '总计', value: '$totalCount', color: Colors.grey),
                   const SizedBox(width: 8),
                   _StatChip(label: '请求', value: '$totalRequests', color: Colors.blue),
                   const SizedBox(width: 8),
