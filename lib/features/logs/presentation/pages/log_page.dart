@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_stats.dart';
-import 'package:llm_proxy/features/logs/presentation/providers/unified_log_providers.dart';
+import 'package:llm_proxy/features/logs/presentation/providers/log_providers.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_filter_dialog.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_item.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_range_dialog.dart';
@@ -15,17 +15,17 @@ class LogPage extends ConsumerStatefulWidget {
   const LogPage({super.key});
 
   @override
-  ConsumerState<LogPage> createState() => _UnifiedLogPageState();
+  ConsumerState<LogPage> createState() => _LogPageState();
 }
 
-class _UnifiedLogPageState extends ConsumerState<LogPage> {
+class _LogPageState extends ConsumerState<LogPage> {
   final ScrollController _scrollController = ScrollController();
 
-  UnifiedLogNotifier get _notifier => ref.read(unifiedLogProvider.notifier);
+  LogNotifier get _notifier => ref.read(logProvider.notifier);
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(unifiedLogProvider);
+    final state = ref.watch(logProvider);
     final hasFilter = !state.filter.isEmpty;
 
     return Scaffold(
@@ -116,7 +116,7 @@ class _UnifiedLogPageState extends ConsumerState<LogPage> {
     );
   }
 
-  Widget _buildBody(UnifiedLogState state) {
+  Widget _buildBody(LogState state) {
     if (state.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -226,7 +226,7 @@ class _UnifiedLogPageState extends ConsumerState<LogPage> {
     );
   }
 
-  Future<void> _confirmClear(UnifiedLogState state) async {
+  Future<void> _confirmClear(LogState state) async {
     final filtered = state.filteredEntries;
     if (filtered.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -283,13 +283,13 @@ class _UnifiedLogPageState extends ConsumerState<LogPage> {
     }
   }
 
-  Future<void> _exportLogs(UnifiedLogState state) async {
+  Future<void> _exportLogs(LogState state) async {
     final dir = await FilePicker.getDirectoryPath(
       dialogTitle: '选择导出目录',
     );
     if (dir == null) return;
 
-    final notifier = ref.read(unifiedLogProvider.notifier);
+    final notifier = ref.read(logProvider.notifier);
     await notifier.exportLogs(dir);
 
     if (mounted) {
@@ -311,7 +311,7 @@ class _UnifiedLogPageState extends ConsumerState<LogPage> {
     final filePath = result.files.single.path;
     if (filePath == null) return;
 
-    final notifier = ref.read(unifiedLogProvider.notifier);
+    final notifier = ref.read(logProvider.notifier);
     final count = await notifier.importLogs(filePath);
 
     if (mounted) {
@@ -321,14 +321,14 @@ class _UnifiedLogPageState extends ConsumerState<LogPage> {
     }
   }
 
-  void _showFilterDialog(UnifiedLogState state) {
+  void _showFilterDialog(LogState state) {
     showDialog(
       context: context,
       builder: (_) => LogFilterDialog(state: state),
     );
   }
 
-  void _showRangeDialog(UnifiedLogState state) {
+  void _showRangeDialog(LogState state) {
     showDialog(
       context: context,
       builder: (_) => LogRangeDialog(state: state),

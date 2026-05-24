@@ -11,12 +11,12 @@ import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart'
 import 'package:llm_proxy/features/proxy/presentation/providers/proxy_providers.dart';
 
 /// 日志过滤条件
-class UnifiedLogFilter {
+class LogFilter {
   final String keyword;
   final String? modelFilter;
   final String? endpointFilter;
 
-  const UnifiedLogFilter({
+  const LogFilter({
     this.keyword = '',
     this.modelFilter,
     this.endpointFilter,
@@ -61,13 +61,13 @@ class UnifiedLogFilter {
   }
 }
 
-class UnifiedLogState {
+class LogState {
   final List<LogEntry> allEntries;
   final bool isLoading;
   final bool isLoadingMore;
   final bool hasMore;
   final String? error;
-  final UnifiedLogFilter filter;
+  final LogFilter filter;
   final int? rangeStart;
   final int? rangeEnd;
   final bool reversed;
@@ -77,13 +77,13 @@ class UnifiedLogState {
   /// 缓存当前过滤/排序后的显示列表，每个元素携带在 allEntries 中的真实序号
   final List<({LogEntry entry, int seq})> displayEntries;
 
-  const UnifiedLogState({
+  const LogState({
     this.allEntries = const [],
     this.isLoading = false,
     this.isLoadingMore = false,
     this.hasMore = true,
     this.error,
-    this.filter = const UnifiedLogFilter(),
+    this.filter = const LogFilter(),
     this.rangeStart,
     this.rangeEnd,
     this.reversed = false,
@@ -92,13 +92,13 @@ class UnifiedLogState {
     this.displayEntries = const [],
   });
 
-  UnifiedLogState copyWith({
+  LogState copyWith({
     List<LogEntry>? allEntries,
     bool? isLoading,
     bool? isLoadingMore,
     bool? hasMore,
     String? error,
-    UnifiedLogFilter? filter,
+    LogFilter? filter,
     int? rangeStart,
     int? rangeEnd,
     bool? reversed,
@@ -109,7 +109,7 @@ class UnifiedLogState {
     bool clearError = false,
     bool clearStats = false,
   }) {
-    return UnifiedLogState(
+    return LogState(
       allEntries: allEntries ?? this.allEntries,
       isLoading: isLoading ?? this.isLoading,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
@@ -140,18 +140,18 @@ class UnifiedLogState {
   }
 }
 
-class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
+class LogNotifier extends Notifier<LogState> {
   StreamSubscription<LogChangeEvent>? _changeSub;
   LogRepository get _repo => ref.read(logRepositoryProvider);
 
   static const int _pageSize = 100;
 
   @override
-  UnifiedLogState build() {
+  LogState build() {
     _loadInitial();
     _changeSub = _repo.changeStream.listen(_handleChangeEvent);
     ref.onDispose(() => _changeSub?.cancel());
-    return const UnifiedLogState(isLoading: true);
+    return const LogState(isLoading: true);
   }
 
   void _handleChangeEvent(LogChangeEvent event) {
@@ -186,7 +186,6 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
       }
       state = state.copyWith(
         allEntries: [newLog, ...entries],
-        hasMore: true,
         clearError: true,
       );
       _rebuildDisplay();
@@ -340,7 +339,7 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
     _computeStats();
   }
 
-  void setFilter(UnifiedLogFilter filter) {
+  void setFilter(LogFilter filter) {
     state = state.copyWith(filter: filter);
     _rebuildDisplay();
     _computeStats();
@@ -453,7 +452,7 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
   }
 }
 
-final unifiedLogProvider =
-    NotifierProvider<UnifiedLogNotifier, UnifiedLogState>(
-  UnifiedLogNotifier.new,
+final logProvider =
+    NotifierProvider<LogNotifier, LogState>(
+  LogNotifier.new,
 );

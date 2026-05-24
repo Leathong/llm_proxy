@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:llm_proxy/features/logs/presentation/providers/unified_log_providers.dart';
+import 'package:llm_proxy/features/logs/presentation/providers/log_providers.dart';
 
 class LogRangeDialog extends ConsumerStatefulWidget {
-  final UnifiedLogState state;
+  final LogState state;
 
   const LogRangeDialog({super.key, required this.state});
 
@@ -18,7 +18,7 @@ class _LogRangeDialogState extends ConsumerState<LogRangeDialog> {
   late TextEditingController _startCtrl;
   late TextEditingController _endCtrl;
 
-  UnifiedLogState get _state => widget.state;
+  LogState get _state => widget.state;
 
   @override
   void initState() {
@@ -173,9 +173,9 @@ class _LogRangeDialogState extends ConsumerState<LogRangeDialog> {
                     TextButton.icon(
                       onPressed: () async {
                         await ref
-                            .read(unifiedLogProvider.notifier)
+                            .read(logProvider.notifier)
                             .loadMore();
-                        final newState = ref.read(unifiedLogProvider);
+                        final newState = ref.read(logProvider);
                         final newTotal = newState.allEntries.length;
                         setDialogState(() {
                           _total = newTotal;
@@ -194,7 +194,7 @@ class _LogRangeDialogState extends ConsumerState<LogRangeDialog> {
                     children: [
                       TextButton(
                         onPressed: () {
-                          ref.read(unifiedLogProvider.notifier).clearRange();
+                          ref.read(logProvider.notifier).clearRange();
                           Navigator.of(ctx).pop();
                         },
                         child: const Text('清除'),
@@ -203,7 +203,7 @@ class _LogRangeDialogState extends ConsumerState<LogRangeDialog> {
                       FilledButton(
                         onPressed: () {
                           ref
-                              .read(unifiedLogProvider.notifier)
+                              .read(logProvider.notifier)
                               .setRange(_tempStart.toInt(), _tempEnd.toInt());
                           Navigator.of(ctx).pop();
                         },

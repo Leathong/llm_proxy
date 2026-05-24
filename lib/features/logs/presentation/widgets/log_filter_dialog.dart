@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:llm_proxy/features/logs/presentation/providers/unified_log_providers.dart';
+import 'package:llm_proxy/features/logs/presentation/providers/log_providers.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_filter_dropdown.dart';
 
 class LogFilterDialog extends ConsumerStatefulWidget {
-  final UnifiedLogState state;
+  final LogState state;
 
   const LogFilterDialog({super.key, required this.state});
 
@@ -18,7 +18,7 @@ class _LogFilterDialogState extends ConsumerState<LogFilterDialog> {
   late String? _tempModelFilter;
   late String? _tempEndpointFilter;
 
-  UnifiedLogState get _state => widget.state;
+  LogState get _state => widget.state;
 
   @override
   void initState() {
@@ -38,8 +38,8 @@ class _LogFilterDialogState extends ConsumerState<LogFilterDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final models = UnifiedLogFilter.availableModels(_state.allEntries);
-    final endpoints = UnifiedLogFilter.availableEndpoints(_state.allEntries);
+    final models = LogFilter.availableModels(_state.allEntries);
+    final endpoints = LogFilter.availableEndpoints(_state.allEntries);
 
     return StatefulBuilder(
       builder: (ctx, setDialogState) => Dialog(
@@ -135,8 +135,8 @@ class _LogFilterDialogState extends ConsumerState<LogFilterDialog> {
                   TextButton(
                     onPressed: () {
                       ref
-                          .read(unifiedLogProvider.notifier)
-                          .setFilter(const UnifiedLogFilter());
+                          .read(logProvider.notifier)
+                          .setFilter(const LogFilter());
                       Navigator.of(ctx).pop();
                     },
                     child: const Text('清除'),
@@ -144,8 +144,8 @@ class _LogFilterDialogState extends ConsumerState<LogFilterDialog> {
                   const SizedBox(width: 8),
                   FilledButton(
                     onPressed: () {
-                      ref.read(unifiedLogProvider.notifier).setFilter(
-                          UnifiedLogFilter(
+                      ref.read(logProvider.notifier).setFilter(
+                          LogFilter(
                             keyword: _tempKeyword,
                             modelFilter: _tempModelFilter,
                             endpointFilter: _tempEndpointFilter,
