@@ -17,6 +17,28 @@ class UnifiedLogPage extends ConsumerStatefulWidget {
 }
 
 class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      ref.read(unifiedLogProvider.notifier).loadMore();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(unifiedLogProvider);
@@ -114,10 +136,7 @@ class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
       );
     }
 
-    final filtered = state.filteredEntries;
-    final displayEntries =
-        state.reversed ? filtered.reversed.toList() : filtered;
-
+    final displayEntries = state.displayEntries;
     final hasFilter = !state.filter.isEmpty || state.rangeStart != null;
 
     return Column(
@@ -142,11 +161,17 @@ class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
         else
           Expanded(
             child: ListView.builder(
-              itemCount: displayEntries.length,
+              controller: _scrollController,
+              itemCount: displayEntries.length + (state.hasMore ? 1 : 0),
               itemBuilder: (context, index) {
-                final log = displayEntries[index];
-                final seq = state.allEntries.indexOf(log) + 1;
-                return _LogItem(log: log, seq: seq);
+                if (index >= displayEntries.length) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                  );
+                }
+                final item = displayEntries[index];
+                return _LogItem(log: item.entry, seq: item.seq);
               },
             ),
           ),

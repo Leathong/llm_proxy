@@ -191,6 +191,7 @@ class DriftLogRepository implements LogRepository {
     int? offset,
     int? limit,
     bool desc = true,
+    int? cursor,
   }) async {
     final query = _db.select(_db.proxyLogs)
       ..orderBy([
@@ -198,8 +199,19 @@ class DriftLogRepository implements LogRepository {
               expression: t.id,
               mode: desc ? drift.OrderingMode.desc : drift.OrderingMode.asc,
             ),
-      ])
-      ..limit(limit ?? 1000, offset: offset ?? 0);
+      ]);
+
+    if (cursor != null) {
+      if (desc) {
+        query.where((t) => t.id.isSmallerThan(drift.Constant(cursor)));
+      } else {
+        query.where((t) => t.id.isBiggerThan(drift.Constant(cursor)));
+      }
+      query.limit(limit ?? 1000);
+    } else {
+      query.limit(limit ?? 1000, offset: offset ?? 0);
+    }
+
     final rows = await query.get();
     return rows.map(_rowToEntry).toList();
   }
@@ -212,25 +224,36 @@ class DriftLogRepository implements LogRepository {
     int? offset,
     int? limit,
     bool desc = true,
+    int? cursor,
   }) async {
-    var query = _db.select(_db.proxyLogs)
+    final query = _db.select(_db.proxyLogs)
       ..orderBy([
         (t) => drift.OrderingTerm(
               expression: t.id,
               mode: desc ? drift.OrderingMode.desc : drift.OrderingMode.asc,
             ),
-      ])
-      ..limit(limit ?? 1000, offset: offset ?? 0);
+      ]);
+
+    if (cursor != null) {
+      if (desc) {
+        query.where((t) => t.id.isSmallerThan(drift.Constant(cursor)));
+      } else {
+        query.where((t) => t.id.isBiggerThan(drift.Constant(cursor)));
+      }
+      query.limit(limit ?? 1000);
+    } else {
+      query.limit(limit ?? 1000, offset: offset ?? 0);
+    }
 
     if (keyword != null && keyword.isNotEmpty) {
       final kw = '%$keyword%';
-      query = query..where((t) => t.model.like(kw) | t.targetEndpoint.like(kw) | t.path.like(kw));
+      query.where((t) => t.model.like(kw) | t.targetEndpoint.like(kw) | t.path.like(kw));
     }
     if (modelFilter != null && modelFilter.isNotEmpty) {
-      query = query..where((t) => t.model.equals(modelFilter));
+      query.where((t) => t.model.equals(modelFilter));
     }
     if (endpointFilter != null && endpointFilter.isNotEmpty) {
-      query = query..where((t) => t.targetEndpoint.equals(endpointFilter));
+      query.where((t) => t.targetEndpoint.equals(endpointFilter));
     }
 
     final rows = await query.get();

@@ -5,7 +5,12 @@ abstract class LogRepository {
 
   Future<int> get logCount;
   Future<LogEntry?> getLog(int id);
-  Future<List<LogEntry>> getLogs({int? offset, int? limit, bool desc = true});
+  Future<List<LogEntry>> getLogs({
+    int? offset,
+    int? limit,
+    bool desc = true,
+    int? cursor,
+  });
   Future<List<LogEntry>> searchLogs({
     String? keyword,
     String? modelFilter,
@@ -13,6 +18,7 @@ abstract class LogRepository {
     int? offset,
     int? limit,
     bool desc = true,
+    int? cursor,
   });
   Future<List<LogEntry>> getRange(int start, int end);
 

@@ -67,6 +67,10 @@ class MillisDateTimeConverter extends TypeConverter<DateTime, int> {
 }
 
 /// 代理请求/响应日志（统一存储实时日志与历史分析所需的所有字段）
+@TableIndex(name: 'idx_proxy_logs_time', columns: {#time})
+@TableIndex(name: 'idx_proxy_logs_model', columns: {#model})
+@TableIndex(name: 'idx_proxy_logs_endpoint', columns: {#targetEndpoint})
+@TableIndex(name: 'idx_proxy_logs_status', columns: {#status})
 class ProxyLogs extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get method => text()();

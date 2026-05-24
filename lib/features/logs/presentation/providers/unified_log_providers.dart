@@ -64,6 +64,8 @@ class UnifiedLogFilter {
 class UnifiedLogState {
   final List<LogEntry> allEntries;
   final bool isLoading;
+  final bool isLoadingMore;
+  final bool hasMore;
   final String? error;
   final UnifiedLogFilter filter;
   final int? rangeStart;
@@ -72,9 +74,14 @@ class UnifiedLogState {
   final bool subtractFirstByte;
   final LogStats? stats;
 
+  /// 缓存当前过滤/排序后的显示列表，每个元素携带在 allEntries 中的真实序号
+  final List<({LogEntry entry, int seq})> displayEntries;
+
   const UnifiedLogState({
     this.allEntries = const [],
     this.isLoading = false,
+    this.isLoadingMore = false,
+    this.hasMore = true,
     this.error,
     this.filter = const UnifiedLogFilter(),
     this.rangeStart,
@@ -82,11 +89,14 @@ class UnifiedLogState {
     this.reversed = false,
     this.subtractFirstByte = false,
     this.stats,
+    this.displayEntries = const [],
   });
 
   UnifiedLogState copyWith({
     List<LogEntry>? allEntries,
     bool? isLoading,
+    bool? isLoadingMore,
+    bool? hasMore,
     String? error,
     UnifiedLogFilter? filter,
     int? rangeStart,
@@ -94,6 +104,7 @@ class UnifiedLogState {
     bool? reversed,
     bool? subtractFirstByte,
     LogStats? stats,
+    List<({LogEntry entry, int seq})>? displayEntries,
     bool clearRange = false,
     bool clearError = false,
     bool clearStats = false,
@@ -101,6 +112,8 @@ class UnifiedLogState {
     return UnifiedLogState(
       allEntries: allEntries ?? this.allEntries,
       isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMore: hasMore ?? this.hasMore,
       error: clearError ? null : (error ?? this.error),
       filter: filter ?? this.filter,
       rangeStart: clearRange ? null : (rangeStart ?? this.rangeStart),
@@ -108,6 +121,7 @@ class UnifiedLogState {
       reversed: reversed ?? this.reversed,
       subtractFirstByte: subtractFirstByte ?? this.subtractFirstByte,
       stats: clearStats ? null : (stats ?? this.stats),
+      displayEntries: displayEntries ?? this.displayEntries,
     );
   }
 
@@ -130,22 +144,79 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
   StreamSubscription<void>? _changeSub;
   LogRepository get _repo => ref.read(logRepositoryProvider);
 
+  static const int _pageSize = 100;
+
   @override
   UnifiedLogState build() {
-    _loadEntries();
-    _changeSub = _repo.changeStream.listen((_) => _loadEntries());
+    _loadInitial();
+    _changeSub = _repo.changeStream.listen((_) => _reloadAll());
     ref.onDispose(() => _changeSub?.cancel());
     return const UnifiedLogState(isLoading: true);
   }
 
-  Future<void> _loadEntries() async {
+  /// 根据当前 allEntries / filter / range / reversed 重建 displayEntries 缓存
+  void _rebuildDisplay() {
+    final s = state;
+    final rangeEntries = s.rangeEntries;
+    final filtered = s.filter.isEmpty
+        ? rangeEntries
+        : rangeEntries.where(s.filter.matches).toList();
+    final all = s.allEntries;
+    final display = (s.reversed ? filtered.reversed.toList() : filtered)
+        .map((e) => (entry: e, seq: all.indexOf(e) + 1))
+        .toList();
+    state = state.copyWith(displayEntries: display);
+  }
+
+  Future<void> _loadInitial() async {
     try {
-      final entries = await _repo.getLogs(limit: 2000, desc: true);
+      final entries = await _repo.getLogs(limit: _pageSize, desc: true);
       state = state.copyWith(
         allEntries: entries,
         isLoading: false,
+        hasMore: entries.length >= _pageSize,
         clearError: true,
       );
+      _rebuildDisplay();
+      _computeStats();
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '加载日志失败: $e');
+    }
+  }
+
+  Future<void> loadMore() async {
+    final s = state;
+    if (s.isLoadingMore || !s.hasMore) return;
+    state = state.copyWith(isLoadingMore: true);
+    try {
+      final lastId = s.allEntries.last.id;
+      final more = await _repo.getLogs(
+        limit: _pageSize,
+        desc: true,
+        cursor: lastId,
+      );
+      state = state.copyWith(
+        allEntries: [...s.allEntries, ...more],
+        isLoadingMore: false,
+        hasMore: more.length >= _pageSize,
+      );
+      _rebuildDisplay();
+      _computeStats();
+    } catch (e) {
+      state = state.copyWith(isLoadingMore: false, error: '加载更多失败: $e');
+    }
+  }
+
+  Future<void> _reloadAll() async {
+    try {
+      final entries = await _repo.getLogs(limit: _pageSize, desc: true);
+      state = state.copyWith(
+        allEntries: entries,
+        isLoading: false,
+        hasMore: entries.length >= _pageSize,
+        clearError: true,
+      );
+      _rebuildDisplay();
       _computeStats();
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '加载日志失败: $e');
@@ -178,7 +249,12 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
     }).toList();
   }
 
-  void setReversed(bool v) => state = state.copyWith(reversed: v);
+  void setReversed(bool v) {
+    state = state.copyWith(reversed: v);
+    _rebuildDisplay();
+    _computeStats();
+  }
+
   void setSubtractFirstByte(bool v) {
     state = state.copyWith(subtractFirstByte: v);
     _computeStats();
@@ -186,6 +262,7 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
 
   void setFilter(UnifiedLogFilter filter) {
     state = state.copyWith(filter: filter);
+    _rebuildDisplay();
     _computeStats();
   }
 
@@ -194,11 +271,13 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
     final clampedStart = start.clamp(0, len);
     final clampedEnd = end.clamp(clampedStart, len);
     state = state.copyWith(rangeStart: clampedStart, rangeEnd: clampedEnd);
+    _rebuildDisplay();
     _computeStats();
   }
 
   void clearRange() {
     state = state.copyWith(clearRange: true);
+    _rebuildDisplay();
     _computeStats();
   }
 
@@ -208,7 +287,6 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
     await _repo.deleteLogs(ids);
   }
 
-  /// 将当前日志导出为 .log 文件
   Future<void> exportLogs(String dirPath) async {
     final writer = LogFileWriter();
     writer.setLogFileDir(dirPath);
@@ -232,7 +310,6 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
     }
   }
 
-  /// 从 .log 文件导入日志到数据库
   Future<int> importLogs(String filePath) async {
     final parsedEntries = await LogFileParser.parseFile(filePath);
     if (parsedEntries.isEmpty) return 0;
@@ -244,18 +321,15 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
         await _repo.addLog(logEntry);
         importedCount++;
       } catch (e) {
-        // 跳过解析失败的条目
         continue;
       }
     }
     return importedCount;
   }
 
-  /// 将 FileLogEntry 转换为数据库 LogEntry
   LogEntry _fileLogEntryToLogEntry(FileLogEntry entry) {
     DateTime time;
     try {
-      // 优先尝试带毫秒的格式，失败则回退到旧格式
       time = DateFormat('yyyy-MM-dd HH:mm:ss.SSS').parse(entry.timestamp);
     } catch (_) {
       try {

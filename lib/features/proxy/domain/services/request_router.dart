@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -27,6 +28,10 @@ class RequestRouter {
   final RequestForwarder forwarder;
   final LogRepository logRepository;
 
+  final StreamController<LogEntry> _logWriteController =
+      StreamController<LogEntry>.broadcast();
+  StreamSubscription<LogEntry>? _logWriteSub;
+
   RequestRouter({
     required this.getRules,
     required this.logger,
@@ -34,7 +39,15 @@ class RequestRouter {
     required this.transformer,
     required this.forwarder,
     required this.logRepository,
-  });
+  }) {
+    _logWriteSub = _logWriteController.stream
+        .listen((entry) => logRepository.addLog(entry));
+  }
+
+  void dispose() {
+    _logWriteSub?.cancel();
+    _logWriteController.close();
+  }
 
   Future<void> handle(HttpRequest request) async {
     try {
@@ -97,7 +110,7 @@ class RequestRouter {
     logger.log('已返回可用模型列表: $modelNames');
 
     final duration = DateTime.now().difference(startTime).inMilliseconds;
-    final _ = await logRepository.addLog(LogEntry(
+    _logWriteController.add(LogEntry(
       id: 0,
       time: startTime,
       method: request.method,
@@ -156,6 +169,7 @@ class RequestRouter {
         model: requestedModelId,
         status: LogStatus.pending,
       ));
+      // pending 日志需要同步写入以确保 logId 可用，后续 update 可异步
 
       final allRules = await getRules();
       final matchResult = ruleMatcher.match(allRules, requestedModelId);
@@ -178,12 +192,12 @@ class RequestRouter {
         await request.response.close();
 
         final duration = DateTime.now().difference(startTime).inMilliseconds;
-        await logRepository.updateLog(LogEntry(
+        unawaited(logRepository.updateLog(LogEntry(
           id: logId, time: startTime, method: request.method,
           path: request.uri.path, model: requestedModelId,
           statusCode: statusCode, status: LogStatus.error, error: errorMsg,
           requestDurationMs: duration,
-        ));
+        )));
         return;
       }
 
@@ -208,14 +222,14 @@ class RequestRouter {
 
       if (result.clientDisconnected) {
         logger.log('客户端已断开连接，上游请求已取消');
-        await logRepository.updateLog(LogEntry(
+        unawaited(logRepository.updateLog(LogEntry(
           id: logId, time: startTime, method: request.method,
           path: request.uri.path, model: requestedModelId,
           targetEndpoint: targetUrl, statusCode: result.statusCode,
           status: LogStatus.error, error: 'Client disconnected',
           firstByteDurationMs: result.firstByteMs,
           requestDurationMs: duration,
-        ));
+        )));
         return;
       }
 
@@ -285,17 +299,17 @@ class RequestRouter {
         parsedResponse: parsedResp,
       );
 
-      await logRepository.updateLog(updatedEntry);
+      unawaited(logRepository.updateLog(updatedEntry));
     } catch (e) {
       logger.log('处理请求出错: $e');
       final duration = DateTime.now().difference(startTime).inMilliseconds;
       if (logId > 0) {
-        await logRepository.updateLog(LogEntry(
+        unawaited(logRepository.updateLog(LogEntry(
           id: logId, time: startTime, method: request.method,
           path: request.uri.path, statusCode: HttpStatus.internalServerError,
           status: LogStatus.error, error: e.toString(),
           requestDurationMs: duration,
-        ));
+        )));
       }
       try {
         request.response.statusCode = HttpStatus.internalServerError;

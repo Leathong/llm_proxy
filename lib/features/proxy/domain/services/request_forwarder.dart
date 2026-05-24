@@ -24,6 +24,26 @@ class ForwardResult {
 
 /// 负责将客户端请求转发到上游 API，并将响应回写给客户端
 class RequestForwarder {
+  /// 按 host 复用的 HttpClient 连接池
+  final Map<String, HttpClient> _clientPool = {};
+
+  HttpClient _getClient(String host) {
+    if (_clientPool.containsKey(host)) {
+      return _clientPool[host]!;
+    }
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 30);
+    _clientPool[host] = client;
+    return client;
+  }
+
+  void dispose() {
+    for (final client in _clientPool.values) {
+      client.close(force: true);
+    }
+    _clientPool.clear();
+  }
+
   /// 转发请求到目标 URL，返回转发结果
   /// 当客户端断开连接时，会立即取消上游请求以节省资源
   /// SSE 流式响应会逐块透传给客户端，不再缓冲全部数据
@@ -36,14 +56,13 @@ class RequestForwarder {
     bool convertThinkingToContent = false,
   }) async {
     final uri = Uri.parse(targetUrl);
-    final client = HttpClient();
+    final client = _getClient(uri.host);
     var clientDisconnected = false;
 
     // 监听客户端断开：response.done 完成时说明客户端已断开或响应已关闭
     // 注意：不能用 catchError，因为客户端断开时 done 是正常完成而非报错
     clientRequest.response.done.whenComplete(() {
       clientDisconnected = true;
-      client.close(force: true);
     });
 
     try {
@@ -161,7 +180,6 @@ class RequestForwarder {
         error: e.toString(),
       );
     } finally {
-      client.close();
       // 确保客户端响应被关闭，防止客户端一直等待
       if (!clientDisconnected) {
         try { await clientRequest.response.close(); } catch (_) {}
