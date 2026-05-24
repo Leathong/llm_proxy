@@ -61,6 +61,7 @@ class LogFilter {
   }
 }
 
+const int pageSizeConst = 20;
 class LogState {
   final List<LogEntry> allEntries;
   final bool isLoading;
@@ -73,6 +74,7 @@ class LogState {
   final bool reversed;
   final bool subtractFirstByte;
   final LogStats? stats;
+  final int pageSize;
 
   /// 缓存当前过滤/排序后的显示列表，每个元素携带在 allEntries 中的真实序号
   final List<({LogEntry entry, int seq})> displayEntries;
@@ -89,6 +91,7 @@ class LogState {
     this.reversed = false,
     this.subtractFirstByte = false,
     this.stats,
+    this.pageSize = pageSizeConst,
     this.displayEntries = const [],
   });
 
@@ -104,6 +107,7 @@ class LogState {
     bool? reversed,
     bool? subtractFirstByte,
     LogStats? stats,
+    int? pageSize,
     List<({LogEntry entry, int seq})>? displayEntries,
     bool clearRange = false,
     bool clearError = false,
@@ -121,6 +125,7 @@ class LogState {
       reversed: reversed ?? this.reversed,
       subtractFirstByte: subtractFirstByte ?? this.subtractFirstByte,
       stats: clearStats ? null : (stats ?? this.stats),
+      pageSize: pageSize ?? this.pageSize,
       displayEntries: displayEntries ?? this.displayEntries,
     );
   }
@@ -143,8 +148,6 @@ class LogState {
 class LogNotifier extends Notifier<LogState> {
   StreamSubscription<LogChangeEvent>? _changeSub;
   LogRepository get _repo => ref.read(logRepositoryProvider);
-
-  static const int _pageSize = 100;
 
   @override
   LogState build() {
@@ -249,11 +252,11 @@ class LogNotifier extends Notifier<LogState> {
 
   Future<void> _loadInitial() async {
     try {
-      final entries = await _repo.getLogs(limit: _pageSize, desc: true);
+      final entries = await _repo.getLogs(limit: pageSizeConst, desc: true);
       state = state.copyWith(
         allEntries: entries,
         isLoading: false,
-        hasMore: entries.length >= _pageSize,
+        hasMore: entries.length >= pageSizeConst,
         clearError: true,
       );
       _rebuildDisplay();
@@ -268,16 +271,17 @@ class LogNotifier extends Notifier<LogState> {
     if (s.isLoadingMore || !s.hasMore) return;
     state = state.copyWith(isLoadingMore: true);
     try {
+      final pageSize = s.pageSize;
       final lastId = s.allEntries.last.id;
       final more = await _repo.getLogs(
-        limit: _pageSize,
+        limit: pageSize,
         desc: true,
         cursor: lastId,
       );
       state = state.copyWith(
         allEntries: [...s.allEntries, ...more],
         isLoadingMore: false,
-        hasMore: more.length >= _pageSize,
+        hasMore: more.length >= pageSize,
       );
       _rebuildDisplay();
       _computeStats();
@@ -288,11 +292,11 @@ class LogNotifier extends Notifier<LogState> {
 
   Future<void> _reloadAll() async {
     try {
-      final entries = await _repo.getLogs(limit: _pageSize, desc: true);
+      final entries = await _repo.getLogs(limit: pageSizeConst, desc: true);
       state = state.copyWith(
         allEntries: entries,
         isLoading: false,
-        hasMore: entries.length >= _pageSize,
+        hasMore: entries.length >= pageSizeConst,
         clearError: true,
       );
       _rebuildDisplay();
@@ -300,6 +304,11 @@ class LogNotifier extends Notifier<LogState> {
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '加载日志失败: $e');
     }
+  }
+
+  void setPageSize(int pageSize) {
+    if (pageSize < 1) return;
+    state = state.copyWith(pageSize: pageSize);
   }
 
   void _computeStats() {

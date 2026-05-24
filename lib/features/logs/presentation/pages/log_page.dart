@@ -20,8 +20,15 @@ class LogPage extends ConsumerStatefulWidget {
 
 class _LogPageState extends ConsumerState<LogPage> {
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _pageSizeController = TextEditingController(text: pageSizeConst.toString());
 
   LogNotifier get _notifier => ref.read(logProvider.notifier);
+
+  @override
+  void dispose() {
+    _pageSizeController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,79 +44,77 @@ class _LogPageState extends ConsumerState<LogPage> {
             tooltip: '导入日志',
             onPressed: () => _importLogs(),
           ),
-          if (state.allEntries.isNotEmpty) ...[
-            IconButton(
-              icon: Icon(
-                Icons.filter_list,
-                color: hasFilter ? Colors.blue : null,
-              ),
-              tooltip: hasFilter ? '过滤中 (点击修改)' : '过滤',
-              onPressed: () => _showFilterDialog(state),
+          IconButton(
+            icon: Icon(
+              Icons.filter_list,
+              color: hasFilter ? Colors.blue : null,
             ),
-            IconButton(
-              icon: Icon(
-                state.reversed ? Icons.arrow_upward : Icons.arrow_downward,
-              ),
-              tooltip: state.reversed ? '切换为正序' : '切换为倒序',
-              onPressed: () {
-                _notifier.setReversed(!state.reversed);
-              },
+            tooltip: hasFilter ? '过滤中 (点击修改)' : '过滤',
+            onPressed: () => _showFilterDialog(state),
+          ),
+          IconButton(
+            icon: Icon(
+              state.reversed ? Icons.arrow_upward : Icons.arrow_downward,
             ),
-            IconButton(
-              icon: Icon(
-                state.subtractFirstByte ? Icons.flash_on : Icons.schedule,
-              ),
-              tooltip: state.subtractFirstByte
-                  ? '速度已减去首字节时间'
-                  : '速度包含首字节时间',
-              onPressed: () {
-                _notifier.setSubtractFirstByte(!state.subtractFirstByte);
-              },
+            tooltip: state.reversed ? '切换为正序' : '切换为倒序',
+            onPressed: () {
+              _notifier.setReversed(!state.reversed);
+            },
+          ),
+          IconButton(
+            icon: Icon(
+              state.subtractFirstByte ? Icons.flash_on : Icons.schedule,
             ),
-            IconButton(
-              icon: const Icon(Icons.file_download),
-              tooltip: '导出日志',
-              onPressed: () => _exportLogs(state),
-            ),
-            IconButton(
-              icon: const Icon(Icons.clear_all),
-              tooltip: '清空显示',
-              onPressed: () => _notifier.clearMemory(),
-            ),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.delete_outline),
-              tooltip: '删除日志',
-              onSelected: (value) {
-                if (value == 'filtered') {
-                  _confirmClear(state);
-                } else if (value == 'all') {
-                  _confirmClearAll();
-                }
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'filtered',
-                  child: ListTile(
-                    leading: const Icon(Icons.filter_list),
-                    title: const Text('删除过滤出的日志'),
-                    subtitle: Text('共 ${state.filteredEntries.length} 条'),
-                    contentPadding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                  ),
+            tooltip: state.subtractFirstByte
+                ? '速度已减去首字节时间'
+                : '速度包含首字节时间',
+            onPressed: () {
+              _notifier.setSubtractFirstByte(!state.subtractFirstByte);
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.file_download),
+            tooltip: '导出日志',
+            onPressed: () => _exportLogs(state),
+          ),
+          IconButton(
+            icon: const Icon(Icons.clear_all),
+            tooltip: '清空显示',
+            onPressed: () => _notifier.clearMemory(),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: '删除日志',
+            onSelected: (value) {
+              if (value == 'filtered') {
+                _confirmClear(state);
+              } else if (value == 'all') {
+                _confirmClearAll();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'filtered',
+                child: ListTile(
+                  leading: const Icon(Icons.filter_list),
+                  title: const Text('删除过滤出的日志'),
+                  subtitle: Text('共 ${state.filteredEntries.length} 条'),
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
                 ),
-                PopupMenuItem(
-                  value: 'all',
-                  child: ListTile(
-                    leading: const Icon(Icons.delete_forever),
-                    title: const Text('清空全部日志'),
-                    subtitle: const Text('清空整个数据库的所有日志记录'),
-                    contentPadding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                  ),
+              ),
+              PopupMenuItem(
+                value: 'all',
+                child: ListTile(
+                  leading: const Icon(Icons.delete_forever),
+                  title: const Text('清空全部日志'),
+                  subtitle: const Text('清空整个数据库的所有日志记录'),
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ],
       ),
       body: _buildBody(state),
@@ -135,25 +140,9 @@ class _LogPageState extends ConsumerState<LogPage> {
       );
     }
 
-    if (state.allEntries.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.list_alt, size: 80, color: Colors.grey),
-            SizedBox(height: 20),
-            Text('暂无日志记录',
-                style: TextStyle(fontSize: 18, color: Colors.grey)),
-            SizedBox(height: 8),
-            Text('代理请求处理完成后会自动记录到此',
-                style: TextStyle(fontSize: 14, color: Colors.grey)),
-          ],
-        ),
-      );
-    }
-
     final displayEntries = state.displayEntries;
     final hasFilter = !state.filter.isEmpty || state.rangeStart != null;
+    final showLoadMore = state.hasMore && (displayEntries.isNotEmpty || state.allEntries.isEmpty);
 
     return Column(
       children: [
@@ -167,46 +156,94 @@ class _LogPageState extends ConsumerState<LogPage> {
           onRangeTap: () => _showRangeDialog(state),
         ),
         const Divider(height: 1),
-        if (displayEntries.isEmpty)
-          const Expanded(
-            child: Center(
-              child: Text('没有匹配的日志记录',
-                  style: TextStyle(color: Colors.grey, fontSize: 14)),
-            ),
-          )
-        else
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              itemCount: displayEntries.length + (state.hasMore ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index >= displayEntries.length) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                    child: Center(
-                      child: state.isLoadingMore
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : OutlinedButton.icon(
-                              icon: const Icon(Icons.expand_more, size: 18),
-                              label: const Text('加载更多'),
-                              onPressed: () => _notifier.loadMore(),
-                            ),
-                    ),
-                  );
-                }
-                final item = displayEntries[index];
-                return LogItem(
-                  entry: _toFileLogEntry(item.entry, item.seq),
-                  subtractFirstByte: state.subtractFirstByte,
-                );
-              },
-            ),
-          ),
+        Expanded(
+          child: displayEntries.isNotEmpty
+              ? ListView.builder(
+                  controller: _scrollController,
+                  itemCount: displayEntries.length + (showLoadMore ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index >= displayEntries.length) {
+                      return _buildLoadMoreButton(isLoadingMore: state.isLoadingMore);
+                    }
+                    final item = displayEntries[index];
+                    return LogItem(
+                      entry: _toFileLogEntry(item.entry, item.seq),
+                      subtractFirstByte: state.subtractFirstByte,
+                    );
+                  },
+                )
+              : Center(
+                  child: state.allEntries.isEmpty && !state.hasMore
+                      ? const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.list_alt, size: 80, color: Colors.grey),
+                            SizedBox(height: 20),
+                            Text('暂无日志记录',
+                                style: TextStyle(fontSize: 18, color: Colors.grey)),
+                            SizedBox(height: 8),
+                            Text('代理请求处理完成后会自动记录到此',
+                                style: TextStyle(fontSize: 14, color: Colors.grey)),
+                          ],
+                        )
+                      : showLoadMore
+                          ? _buildLoadMoreButton(isLoadingMore: state.isLoadingMore)
+                          : const Text('没有匹配的日志记录',
+                              style: TextStyle(color: Colors.grey, fontSize: 14)),
+                ),
+        ),
       ],
+    );
+  }
+
+  Widget _buildLoadMoreButton({bool isLoadingMore = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      child: Center(
+        child: isLoadingMore
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 60,
+                    child: TextField(
+                      controller: _pageSizeController,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: const InputDecoration(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      keyboardType: TextInputType.number,
+                      onChanged: (v) {
+                        final parsed = int.tryParse(v);
+                        if (parsed != null && parsed > 0) {
+                          _notifier.setPageSize(parsed);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text('条/页', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 32,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.expand_more, size: 18),
+                      label: const Text('加载更多'),
+                      onPressed: () => _notifier.loadMore(),
+                    ),
+                  ),
+                ],
+              ),
+      ),
     );
   }
 
