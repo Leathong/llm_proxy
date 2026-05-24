@@ -271,4 +271,11 @@ class DriftLogRepository implements LogRepository {
     await (_db.delete(_db.proxyLogs)..where((t) => t.id.equals(id))).go();
     _changeController.add(null);
   }
+
+  @override
+  Future<void> deleteLogs(List<int> ids) async {
+    if (ids.isEmpty) return;
+    await (_db.delete(_db.proxyLogs)..where((t) => t.id.isIn(ids))).go();
+    _changeController.add(null);
+  }
 }

@@ -20,4 +20,5 @@ abstract class LogRepository {
   Future<void> updateLog(LogEntry updatedLog);
   Future<void> clearLogs();
   Future<void> deleteLog(int id);
+  Future<void> deleteLogs(List<int> ids);
 }

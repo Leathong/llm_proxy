@@ -63,7 +63,7 @@ class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
             IconButton(
               icon: const Icon(Icons.delete_outline),
               tooltip: '清空日志',
-              onPressed: () => _confirmClear(notifier),
+              onPressed: () => _confirmClear(state, notifier),
             ),
           ],
         ],
@@ -164,12 +164,23 @@ class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
     }).toList();
   }
 
-  Future<void> _confirmClear(UnifiedLogNotifier notifier) async {
+  Future<void> _confirmClear(UnifiedLogState state, UnifiedLogNotifier notifier) async {
+    final filtered = state.filteredEntries;
+    if (filtered.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('没有可删除的日志记录')),
+      );
+      return;
+    }
+    final count = filtered.length;
+    final hasFilter = !state.filter.isEmpty;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('清空日志'),
-        content: const Text('确定要清空所有日志记录吗？此操作不可撤销。'),
+        title: const Text('删除日志'),
+        content: Text(hasFilter
+            ? '确定要删除当前过滤出的 $count 条日志记录吗？此操作不可撤销。'
+            : '确定要删除全部 $count 条日志记录吗？此操作不可撤销。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -177,13 +188,13 @@ class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('清空'),
+            child: const Text('删除'),
           ),
         ],
       ),
     );
     if (confirmed == true) {
-      await notifier.clearAllLogs();
+      await notifier.deleteFilteredLogs();
     }
   }
 

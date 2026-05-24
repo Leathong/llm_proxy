@@ -26,13 +26,13 @@ cd "$(dirname "$0")"
 info "开始编译 $APP_NAME ..."
 
 # 1. 获取依赖
-# if ! flutter pub get; then
-#     error "flutter pub get 失败"
+# if ! fvm flutter pub get; then
+#     error "fvm flutter pub get 失败"
 #     exit 1
 # fi
 
 # 2. 编译 macOS release 版本
-if ! flutter build macos --release; then
+if ! fvm flutter build macos --release; then
     error "编译失败"
     exit 1
 fi

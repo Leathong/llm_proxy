@@ -9,7 +9,6 @@ import 'package:llm_proxy/features/proxy/domain/services/request_transformer.dar
 import 'package:llm_proxy/features/proxy/domain/services/rule_matcher.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
 
-/// 代理服务器数据源：仅负责 HttpServer 生命周期管理（启动/停止/监听）
 class ProxyServerDataSource {
   HttpServer? _server;
   bool get isRunning => _server != null;
@@ -38,13 +37,14 @@ class ProxyServerDataSource {
       transformer: _transformer,
       forwarder: _forwarder,
       logRepository: _logRepository,
-      logWriter: _logWriter,
     );
   }
 
   void setLogFileDir(String dir) {
     _logWriter.setLogFileDir(dir);
   }
+
+  LogFileWriter get logWriter => _logWriter;
 
   Future<void> start({int port = 8080, String? certPath, String? keyPath}) async {
     if (isRunning) return;

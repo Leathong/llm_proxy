@@ -161,8 +161,10 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
     state = state.copyWith(clearRange: true);
   }
 
-  Future<void> clearAllLogs() async {
-    await _repo.clearLogs();
+  Future<void> deleteFilteredLogs() async {
+    final ids = state.filteredEntries.map((e) => e.id).toList();
+    if (ids.isEmpty) return;
+    await _repo.deleteLogs(ids);
   }
 
   /// 将当前日志导出为 .log 文件
@@ -173,7 +175,7 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
 
     final entries = state.filteredEntries;
     for (final entry in entries) {
-      writer.writeLog(
+      await writer.writeLog(
         time: entry.time,
         method: entry.method,
         path: entry.path,
