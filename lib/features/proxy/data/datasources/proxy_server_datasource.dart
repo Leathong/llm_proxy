@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:llm_proxy/features/logs/data/datasources/log_file_writer.dart';
-import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
+import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
 import 'package:llm_proxy/features/proxy/domain/services/proxy_logger.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_forwarder.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_router.dart';
@@ -19,19 +19,17 @@ class ProxyServerDataSource {
   final RequestTransformer _transformer = RequestTransformer();
   final RequestForwarder _forwarder = RequestForwarder();
   final LogFileWriter _logWriter = LogFileWriter();
+  final LogRepository _logRepository;
   late final ProxyLogger _logger;
   late final RequestRouter _router;
 
   ProxyServerDataSource({
     required Future<List<Rule>> Function() getRules,
+    required LogRepository logRepository,
     void Function(String message)? onLog,
-    void Function(LogEntry logEntry)? onLogEntry,
-    void Function(LogEntry logEntry)? onLogEntryUpdate,
-  }) {
+  }) : _logRepository = logRepository {
     _logger = ProxyLogger(
       onLog: onLog,
-      onLogEntry: onLogEntry,
-      onLogEntryUpdate: onLogEntryUpdate,
     );
     _router = RequestRouter(
       getRules: getRules,
@@ -39,16 +37,13 @@ class ProxyServerDataSource {
       ruleMatcher: _ruleMatcher,
       transformer: _transformer,
       forwarder: _forwarder,
+      logRepository: _logRepository,
       logWriter: _logWriter,
     );
   }
 
   void setLogFileDir(String dir) {
     _logWriter.setLogFileDir(dir);
-  }
-
-  void setSplitByEndpoint(bool split) {
-    _logWriter.setSplitByEndpoint(split);
   }
 
   Future<void> start({int port = 8080, String? certPath, String? keyPath}) async {

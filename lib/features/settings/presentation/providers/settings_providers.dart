@@ -5,7 +5,6 @@ import 'package:llm_proxy/features/settings/domain/repositories/settings_reposit
 import 'package:llm_proxy/features/settings/data/datasources/settings_local_datasource.dart';
 import 'package:llm_proxy/features/settings/data/repositories/settings_repository_impl.dart';
 
-/// SharedPreferences 实例 Provider（需在 main 中初始化后注入）
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError('必须先在 main 中 override sharedPreferencesProvider');
 });
@@ -49,11 +48,6 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   Future<void> setLogFileDir(String path) async {
     await ref.read(settingsRepositoryProvider).setLogFileDir(path);
-    ref.invalidateSelf();
-  }
-
-  Future<void> setSplitByEndpoint(bool split) async {
-    await ref.read(settingsRepositoryProvider).setSplitByEndpoint(split);
     ref.invalidateSelf();
   }
 }

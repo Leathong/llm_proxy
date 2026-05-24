@@ -1,34 +1,25 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_proxy/features/proxy/data/datasources/proxy_server_datasource.dart';
-import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
-import 'package:llm_proxy/features/logs/presentation/providers/logs_providers.dart';
+import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
+import 'package:llm_proxy/features/logs/data/repositories/drift_log_repository.dart';
 import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.dart';
 import 'package:llm_proxy/features/settings/presentation/providers/settings_providers.dart';
 
-/// ProxyServer 数据源单例
+final logRepositoryProvider = Provider<LogRepository>((ref) {
+  final db = ref.read(appDatabaseProvider);
+  return DriftLogRepository(db);
+});
+
 final proxyServerDataSourceProvider = Provider<ProxyServerDataSource>((ref) {
   final logRepo = ref.read(logRepositoryProvider);
-  final logsNotifier = ref.read(logsProvider.notifier);
   return ProxyServerDataSource(
     getRules: () => ref.read(ruleRepositoryProvider).getRules(),
+    logRepository: logRepo,
     onLog: (msg) => debugPrint('[ProxyServer] $msg'),
-    onLogEntry: (log) {
-      logRepo.addLog(log);
-      logsNotifier.refresh();
-    },
-    onLogEntryUpdate: (log) {
-      final silent = log.status == LogStatus.pending;
-      logRepo.updateLog(log, silent: silent);
-      // silent 模式（pending 中间态）不刷新 UI，减少不必要的重绘
-      if (!silent) {
-        logsNotifier.refresh();
-      }
-    },
   );
 });
 
-/// 代理服务器运行状态
 class ProxyState {
   final bool isRunning;
   final bool isLoading;
@@ -70,7 +61,6 @@ class ProxyNotifier extends Notifier<ProxyState> {
           keyPath: settings.keyPath,
         );
         dataSource.setLogFileDir(settings.logFileDir);
-        dataSource.setSplitByEndpoint(settings.splitByEndpoint);
         state = state.copyWith(isRunning: true, isLoading: false);
       } catch (e) {
         state = state.copyWith(isRunning: false, isLoading: false, error: e.toString());

@@ -29,7 +29,7 @@ String _logStatusToJson(LogStatus status) {
 
 @JsonSerializable()
 class LogEntryDTO {
-  final String id;
+  final int id;
   final DateTime time;
   final String method;
   final String path;

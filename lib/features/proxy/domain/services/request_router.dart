@@ -1,13 +1,23 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:llm_proxy/features/logs/data/datasources/log_file_writer.dart';
+import 'package:llm_proxy/features/logs/data/datasources/log_response_parser.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
+import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
+import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
 import 'package:llm_proxy/features/proxy/domain/services/proxy_logger.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_forwarder.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_transformer.dart';
 import 'package:llm_proxy/features/proxy/domain/services/rule_matcher.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
+
+Map<String, dynamic> _parseRequestBodyIsolate(String rawJson) =>
+    LogResponseParser.parseRequestBody(rawJson);
+
+Map<String, dynamic> _parseResponseBodyIsolate(Map<String, String> params) =>
+    LogResponseParser.parseResponseBody(params['body']!, params['path']!);
 
 /// 请求路由器：根据路径分发请求到对应 handler，组装各 service 完成处理
 class RequestRouter {
@@ -16,6 +26,7 @@ class RequestRouter {
   final RuleMatcher ruleMatcher;
   final RequestTransformer transformer;
   final RequestForwarder forwarder;
+  final LogRepository logRepository;
   final LogFileWriter logWriter;
 
   RequestRouter({
@@ -24,6 +35,7 @@ class RequestRouter {
     required this.ruleMatcher,
     required this.transformer,
     required this.forwarder,
+    required this.logRepository,
     required this.logWriter,
   });
 
@@ -56,7 +68,6 @@ class RequestRouter {
         request.response.write('Internal Server Error: $e');
         await request.response.close();
       } catch (err) {
-        // 响应头可能已发送（流式场景中途异常），直接强制关闭
         logger.log('响应关闭异常: $err');
         try { await request.response.close(); } catch (_) {}
       }
@@ -89,42 +100,34 @@ class RequestRouter {
 
     final modelNames = models.map((m) => m['id']).join(', ');
     logger.log('已返回可用模型列表: $modelNames');
-    logger.emit(
+
+    final duration = DateTime.now().difference(startTime).inMilliseconds;
+    await logRepository.addLog(LogEntry(
+      id: 0, // 由数据库自增分配
       time: startTime,
       method: request.method,
       path: request.uri.path,
       model: modelNames,
       statusCode: 200,
-    );
+      requestDurationMs: duration,
+    ));
+
     logWriter.writeLog(
-      time: startTime,
-      method: request.method,
-      path: request.uri.path,
-      requestBody: null,
-      statusCode: 200,
-      responseBody: responseStr,
-      model: modelNames,
+      time: startTime, method: request.method, path: request.uri.path,
+      requestBody: null, statusCode: 200,
+      responseBody: responseStr, model: modelNames,
     );
   }
 
   /// 处理聊天补全请求：解析 → 匹配规则 → 改写 → 转发
   Future<void> _handleChatCompletions(HttpRequest request, {required String endpoint}) async {
     final startTime = DateTime.now();
-    final logId = logger.nextLogId();
-
-    logger.emitPending(
-      id: logId,
-      time: startTime,
-      method: request.method,
-      path: request.uri.path,
-    );
+    int logId = 0;
 
     try {
-      // --- 请求校验 ---
       if (request.method != 'POST') {
         request.response.statusCode = HttpStatus.methodNotAllowed;
         await request.response.close();
-        _logError(logId, startTime, request, HttpStatus.methodNotAllowed, 'Method not allowed');
         return;
       }
 
@@ -133,7 +136,6 @@ class RequestRouter {
         request.response.statusCode = HttpStatus.badRequest;
         request.response.write('Empty body');
         await request.response.close();
-        _logError(logId, startTime, request, HttpStatus.badRequest, 'Empty body', requestBody: bodyString);
         return;
       }
 
@@ -145,7 +147,6 @@ class RequestRouter {
         request.response.statusCode = HttpStatus.badRequest;
         request.response.write('Invalid JSON');
         await request.response.close();
-        _logError(logId, startTime, request, HttpStatus.badRequest, 'Invalid JSON', requestBody: bodyString);
         return;
       }
 
@@ -154,21 +155,27 @@ class RequestRouter {
         request.response.statusCode = HttpStatus.badRequest;
         request.response.write('Missing model parameter');
         await request.response.close();
-        _logError(logId, startTime, request, HttpStatus.badRequest, 'Missing model parameter', requestBody: bodyString);
         return;
       }
 
-      logger.update(
-        id: logId, time: startTime, method: request.method,
-        path: request.uri.path, model: requestedModelId, status: LogStatus.pending,
-      );
+      // 在 isolate 中解析请求体，不阻塞
+      final parsedReqFuture = compute(_parseRequestBodyIsolate, bodyString);
 
-      // --- 规则匹配 ---
+      // 写入 pending 状态，获取数据库自增 id
+      logId = await logRepository.addLog(LogEntry(
+        id: 0, // 由数据库自增分配
+        time: startTime,
+        method: request.method,
+        path: request.uri.path,
+        model: requestedModelId,
+        status: LogStatus.pending,
+      ));
+
+      // 规则匹配
       final allRules = await getRules();
       final matchResult = ruleMatcher.match(allRules, requestedModelId);
 
       if (matchResult == null) {
-        // 区分：无匹配规则 vs 规则无可用 endpoint
         final hasRule = allRules.any((r) => r.active && r.customModelId == requestedModelId);
         final errorMsg = hasRule ? 'No active endpoint' : 'Model not found';
         final statusCode = hasRule ? HttpStatus.serviceUnavailable : HttpStatus.notFound;
@@ -184,12 +191,14 @@ class RequestRouter {
         request.response.statusCode = statusCode;
         request.response.write(errorResp);
         await request.response.close();
-        logger.log(hasRule ? '规则无可用 endpoint，模型: $requestedModelId' : '未找到匹配的活跃规则，模型: $requestedModelId');
-        logger.update(
+
+        final duration = DateTime.now().difference(startTime).inMilliseconds;
+        await logRepository.updateLog(LogEntry(
           id: logId, time: startTime, method: request.method,
           path: request.uri.path, model: requestedModelId,
           statusCode: statusCode, status: LogStatus.error, error: errorMsg,
-        );
+          requestDurationMs: duration,
+        ));
         logWriter.writeLog(
           time: startTime, method: request.method, path: request.uri.path,
           requestBody: bodyString, statusCode: statusCode,
@@ -202,19 +211,13 @@ class RequestRouter {
       final selectedEndpoint = matchResult.endpoint;
       logger.log('匹配到规则: ${rule.name}, 负载均衡选中 endpoint: ${selectedEndpoint.url}');
 
-      // --- 请求改写 ---
+      // 请求改写
       transformer.transform(bodyJson, rule: rule, requestUri: request.uri, onLog: logger.log);
       final modifiedBodyStr = jsonEncode(bodyJson);
       final newBodyBytes = utf8.encode(modifiedBodyStr);
       final targetUrl = transformer.buildTargetUrl(selectedEndpoint.url, endpoint);
 
-      logger.update(
-        id: logId, time: startTime, method: request.method,
-        path: request.uri.path, model: requestedModelId,
-        targetEndpoint: targetUrl, status: LogStatus.pending,
-      );
-
-      // --- 转发请求 ---
+      // 转发请求
       final result = await forwarder.forward(
         clientRequest: request,
         targetUrl: targetUrl,
@@ -223,53 +226,119 @@ class RequestRouter {
         convertThinkingToContent: rule.convertThinkingToContent,
       );
 
-      // 客户端断开连接，记录日志后直接返回
+      final duration = DateTime.now().difference(startTime).inMilliseconds;
+
       if (result.clientDisconnected) {
         logger.log('客户端已断开连接，上游请求已取消');
-        logger.update(
+        await logRepository.updateLog(LogEntry(
           id: logId, time: startTime, method: request.method,
           path: request.uri.path, model: requestedModelId,
           targetEndpoint: targetUrl, statusCode: result.statusCode,
           status: LogStatus.error, error: 'Client disconnected',
           firstByteDurationMs: result.firstByteMs,
-        );
+          requestDurationMs: duration,
+        ));
         logWriter.writeLog(
           time: startTime, method: request.method, path: request.uri.path,
           requestBody: modifiedBodyStr, statusCode: result.statusCode,
           responseBody: result.responseBody, error: 'Client disconnected',
           model: requestedModelId, targetEndpoint: targetUrl,
-          requestDurationMs: DateTime.now().difference(startTime).inMilliseconds,
-          firstByteMs: result.firstByteMs,
+          requestDurationMs: duration, firstByteMs: result.firstByteMs,
           endpointId: selectedEndpoint.id,
         );
         return;
       }
 
       logger.log('请求转发完成，状态码: ${result.statusCode}');
-      logger.update(
-        id: logId, time: startTime, method: request.method,
-        path: request.uri.path, model: requestedModelId,
-        targetEndpoint: targetUrl, statusCode: result.statusCode,
-        status: result.isError ? LogStatus.error : LogStatus.completed,
+
+      // 在 isolate 中解析响应体，不阻塞客户端
+      final parsedRespFuture = compute(_parseResponseBodyIsolate, {
+        'body': result.responseBody ?? '',
+        'path': endpoint,
+      });
+
+      final parsedReqMap = await parsedReqFuture;
+      final parsedRespMap = await parsedRespFuture;
+
+      // 重建解析后的对象
+      FileLogRequest? parsedReq;
+      if (parsedReqMap.isNotEmpty && parsedReqMap['model'] != null) {
+        final msgs = (parsedReqMap['messages'] as List?)
+                ?.map((m) => FileLogMessage.fromJson(m as Map<String, dynamic>))
+                .toList() ??
+            [];
+        final tools = (parsedReqMap['tools'] as List?)
+            ?.map((t) => FileLogToolDef.fromJson(t as Map<String, dynamic>))
+            .toList();
+        parsedReq = FileLogRequest(
+          model: parsedReqMap['model'] as String?,
+          stream: parsedReqMap['stream'] as bool?,
+          messages: msgs,
+          systemFull: parsedReqMap['system_prompt'] as String?,
+          tools: tools,
+          otherParams: parsedReqMap['other_params'] as Map<String, dynamic>?,
+        );
+      }
+
+      FileLogResponse? parsedResp;
+      if (parsedRespMap.isNotEmpty && parsedRespMap['type'] != null) {
+        FileLogUsage? usage;
+        if (parsedRespMap['usage'] is Map<String, dynamic>) {
+          usage = FileLogUsage.fromJson(
+              parsedRespMap['usage'] as Map<String, dynamic>);
+        }
+        final content = (parsedRespMap['content'] as List?)
+            ?.map((c) =>
+                FileLogContentBlock.fromJson(c as Map<String, dynamic>))
+            .toList();
+        parsedResp = FileLogResponse(
+          type: parsedRespMap['type'] as String?,
+          model: parsedRespMap['model'] as String?,
+          stopReason: parsedRespMap['stop_reason'] as String?,
+          usage: usage,
+          content: content,
+          id: parsedRespMap['id'] as String?,
+        );
+      }
+
+      // 同时写入原始 body
+      final updatedEntry = LogEntry(
+        id: logId,
+        time: startTime,
+        method: request.method,
+        path: request.uri.path,
+        model: requestedModelId,
+        targetEndpoint: targetUrl,
+        statusCode: result.statusCode,
         error: result.error,
+        requestDurationMs: duration,
         firstByteDurationMs: result.firstByteMs,
+        status: result.isError ? LogStatus.error : LogStatus.completed,
+        requestBody: modifiedBodyStr,
+        responseBody: result.responseBody,
+        parsedRequest: parsedReq,
+        parsedResponse: parsedResp,
       );
+
+      await logRepository.updateLog(updatedEntry);
+
       logWriter.writeLog(
         time: startTime, method: request.method, path: request.uri.path,
         requestBody: modifiedBodyStr, statusCode: result.statusCode,
         responseBody: result.responseBody, error: result.error,
         model: requestedModelId, targetEndpoint: targetUrl,
-        requestDurationMs: DateTime.now().difference(startTime).inMilliseconds,
-        firstByteMs: result.firstByteMs,
+        requestDurationMs: duration, firstByteMs: result.firstByteMs,
         endpointId: selectedEndpoint.id,
       );
     } catch (e) {
       logger.log('处理请求出错: $e');
-      logger.update(
+      final duration = DateTime.now().difference(startTime).inMilliseconds;
+      await logRepository.updateLog(LogEntry(
         id: logId, time: startTime, method: request.method,
         path: request.uri.path, statusCode: HttpStatus.internalServerError,
         status: LogStatus.error, error: e.toString(),
-      );
+        requestDurationMs: duration,
+      ));
       logWriter.writeLog(
         time: startTime, method: request.method, path: request.uri.path,
         requestBody: null, statusCode: HttpStatus.internalServerError,
@@ -283,21 +352,5 @@ class RequestRouter {
         logger.log('响应关闭异常: $err');
       }
     }
-  }
-
-  /// 记录错误日志的便捷方法
-  void _logError(
-    String logId, DateTime startTime, HttpRequest request,
-    int statusCode, String error, {String? requestBody,}
-  ) {
-    logger.update(
-      id: logId, time: startTime, method: request.method,
-      path: request.uri.path, statusCode: statusCode,
-      status: LogStatus.error, error: error,
-    );
-    logWriter.writeLog(
-      time: startTime, method: request.method, path: request.uri.path,
-      requestBody: requestBody, statusCode: statusCode, error: error,
-    );
   }
 }

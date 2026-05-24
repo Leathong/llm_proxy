@@ -7,5 +7,4 @@ abstract class SettingsRepository {
   Future<void> setCertPaths(String certPath, String keyPath);
   Future<void> setCertDomains(List<String> domains);
   Future<void> setLogFileDir(String path);
-  Future<void> setSplitByEndpoint(bool split);
 }

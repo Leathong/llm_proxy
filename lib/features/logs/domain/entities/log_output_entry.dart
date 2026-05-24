@@ -6,7 +6,6 @@ class FileLogEntry {
   final String? model;
   final String? forwardTo;
   final int? durationMs;
-  /// 首字节耗时（毫秒）
   final int? firstByteMs;
   final int? statusCode;
   final FileLogRequest? request;
@@ -27,12 +26,12 @@ class FileLogEntry {
     required this.index,
   });
 
-  // 输出 token 速度（tokens/s）
   double? outputTokensPerSecond({bool subtractFirstByte = false}) {
     final out = response?.usage?.outputTokens;
     final dur = durationMs;
     if (out == null || dur == null || dur <= 0) return null;
-    final baseMs = subtractFirstByte && firstByteMs != null ? dur - firstByteMs! : dur;
+    final baseMs =
+        subtractFirstByte && firstByteMs != null ? dur - firstByteMs! : dur;
     if (baseMs <= 0) return null;
     return out / (baseMs / 1000.0);
   }
@@ -63,11 +62,8 @@ class FileLogRequest {
   final String? model;
   final bool? stream;
   final List<FileLogMessage> messages;
-  /// system prompt 内容（截断后的文本预览）
   final String? systemPreview;
-  /// system prompt 完整内容
   final String? systemFull;
-  /// 工具定义列表（仅保留名称和描述摘要）
   final List<FileLogToolDef>? tools;
   final Map<String, dynamic>? otherParams;
 
@@ -97,13 +93,23 @@ class FileLogRequest {
       otherParams: json['other_params'] as Map<String, dynamic>?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        if (model != null) 'model': model,
+        if (stream != null) 'stream': stream,
+        'messages': messages.map((m) => m.toJson()).toList(),
+        if (systemPreview != null) 'system_preview': systemPreview,
+        if (systemFull != null) 'system_full': systemFull,
+        if (tools != null)
+          'tools': tools!.map((t) => t.toJson()).toList(),
+        if (otherParams != null) 'other_params': otherParams,
+      };
 }
 
 /// 对话消息
 class FileLogMessage {
   final String role;
   final String? text;
-  /// 完整消息文本（未截断）
   final String? textFull;
   final List<FileLogToolUse>? toolUses;
   final List<FileLogToolResult>? toolResults;
@@ -130,6 +136,15 @@ class FileLogMessage {
           .toList(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'role': role,
+        if (text != null) 'text': text,
+        if (toolUses != null)
+          'tool_uses': toolUses!.map((t) => t.toJson()).toList(),
+        if (toolResults != null)
+          'tool_results': toolResults!.map((t) => t.toJson()).toList(),
+      };
 }
 
 /// 工具调用
@@ -137,7 +152,6 @@ class FileLogToolUse {
   final String name;
   final String id;
   final String? inputPreview;
-  /// 完整的 input JSON 字符串
   final String? inputFull;
 
   const FileLogToolUse({
@@ -155,13 +169,19 @@ class FileLogToolUse {
       inputFull: json['input_full'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'id': id,
+        if (inputPreview != null) 'input_preview': inputPreview,
+        if (inputFull != null) 'input_full': inputFull,
+      };
 }
 
 /// 工具调用结果
 class FileLogToolResult {
   final String toolUseId;
   final String? contentPreview;
-  /// 完整的工具结果内容
   final String? contentFull;
 
   const FileLogToolResult({
@@ -177,6 +197,12 @@ class FileLogToolResult {
       contentFull: json['content_full'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'tool_use_id': toolUseId,
+        if (contentPreview != null) 'content_preview': contentPreview,
+        if (contentFull != null) 'content_full': contentFull,
+      };
 }
 
 /// 响应体
@@ -232,29 +258,24 @@ class FileLogUsage {
   });
 
   factory FileLogUsage.fromJson(Map<String, dynamic> json) {
-    // 提取 OpenAI prompt_tokens_details 中的缓存信息
     final details =
         json['prompt_tokens_details'] as Map<String, dynamic>? ?? {};
 
     return FileLogUsage(
-      // Anthropic 格式缓存字段 + OpenAI 格式兼容
       cacheCreationInputTokens:
           json['cache_creation_input_tokens'] as int?,
       cacheReadInputTokens:
           json['cache_read_input_tokens'] as int? ??
-          json['prompt_cache_hit_tokens'] as int? ??
-          details['cached_tokens'] as int?,
-      // 输入 token：兼容 Anthropic(input_tokens) 和 OpenAI(prompt_tokens)
+              json['prompt_cache_hit_tokens'] as int? ??
+              details['cached_tokens'] as int?,
       inputTokens:
           json['input_tokens'] as int? ?? json['prompt_tokens'] as int?,
-      // 输出 token：兼容 Anthropic(output_tokens) 和 OpenAI(completion_tokens)
       outputTokens:
           json['output_tokens'] as int? ?? json['completion_tokens'] as int?,
       serviceTier: json['service_tier'] as String?,
     );
   }
 
-  // input_tokens/prompt_tokens 已包含缓存 token，缓存字段是其子计数
   int get totalInputTokens => inputTokens ?? 0;
 }
 
@@ -283,15 +304,21 @@ class FileLogContentBlock {
       input: json['input'] as Map<String, dynamic>?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'type': type,
+        if (text != null) 'text': text,
+        if (id != null) 'id': id,
+        if (name != null) 'name': name,
+        if (input != null) 'input': input,
+      };
 }
 
 /// 工具定义（请求体中的 tools 数组元素）
 class FileLogToolDef {
   final String name;
   final String? descriptionPreview;
-  /// 完整描述文本（用于弹窗展示）
   final String? description;
-  /// 工具参数 schema（用于弹窗展示）
   final Map<String, dynamic>? inputSchema;
 
   const FileLogToolDef({
@@ -309,4 +336,11 @@ class FileLogToolDef {
       inputSchema: json['input_schema'] as Map<String, dynamic>?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        if (descriptionPreview != null) 'description_preview': descriptionPreview,
+        if (description != null) 'description': description,
+        if (inputSchema != null) 'input_schema': inputSchema,
+      };
 }

@@ -20,8 +20,6 @@ class SettingsLocalDataSource {
     return (path != null && path.isNotEmpty) ? path : null;
   }
 
-  bool loadSplitByEndpoint() => _prefs.getBool('splitByEndpoint') ?? true;
-
   Future<void> saveProxyPort(int port) => _prefs.setInt('proxyPort', port);
   Future<void> saveEnableSystemProxy(bool enable) => _prefs.setBool('enableSystemProxy', enable);
   Future<void> saveCertPaths(String certPath, String keyPath) async {
@@ -32,5 +30,4 @@ class SettingsLocalDataSource {
   Future<void> saveCertDomains(List<String> domains) =>
       _prefs.setStringList('certDomains', domains);
   Future<void> saveLogFileDir(String path) => _prefs.setString('logFileDir', path);
-  Future<void> saveSplitByEndpoint(bool split) => _prefs.setBool('splitByEndpoint', split);
 }
