@@ -56,6 +56,11 @@ class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
               },
             ),
             IconButton(
+              icon: const Icon(Icons.file_upload),
+              tooltip: '导入日志',
+              onPressed: () => _importLogs(),
+            ),
+            IconButton(
               icon: const Icon(Icons.file_download),
               tooltip: '导出日志',
               onPressed: () => _exportLogs(state),
@@ -210,6 +215,28 @@ class _UnifiedLogPageState extends ConsumerState<UnifiedLogPage> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('已导出 ${state.filteredEntries.length} 条日志到 $dir')),
+      );
+    }
+  }
+
+  Future<void> _importLogs() async {
+    final result = await FilePicker.pickFiles(
+      dialogTitle: '选择要导入的日志文件',
+      type: FileType.custom,
+      allowedExtensions: ['log'],
+      allowMultiple: false,
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final filePath = result.files.single.path;
+    if (filePath == null) return;
+
+    final notifier = ref.read(unifiedLogProvider.notifier);
+    final count = await notifier.importLogs(filePath);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已成功导入 $count 条日志记录')),
       );
     }
   }

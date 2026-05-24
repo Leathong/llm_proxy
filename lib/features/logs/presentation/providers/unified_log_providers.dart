@@ -1,8 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:llm_proxy/features/logs/data/datasources/log_file_parser.dart';
 import 'package:llm_proxy/features/logs/data/datasources/log_file_writer.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
+import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
 import 'package:llm_proxy/features/proxy/presentation/providers/proxy_providers.dart';
 
@@ -189,6 +192,52 @@ class UnifiedLogNotifier extends Notifier<UnifiedLogState> {
         firstByteMs: entry.firstByteDurationMs,
       );
     }
+  }
+
+  /// 从 .log 文件导入日志到数据库
+  Future<int> importLogs(String filePath) async {
+    final parsedEntries = await LogFileParser.parseFile(filePath);
+    if (parsedEntries.isEmpty) return 0;
+
+    var importedCount = 0;
+    for (final entry in parsedEntries) {
+      try {
+        final logEntry = _fileLogEntryToLogEntry(entry);
+        await _repo.addLog(logEntry);
+        importedCount++;
+      } catch (e) {
+        // 跳过解析失败的条目
+        continue;
+      }
+    }
+    return importedCount;
+  }
+
+  /// 将 FileLogEntry 转换为数据库 LogEntry
+  LogEntry _fileLogEntryToLogEntry(FileLogEntry entry) {
+    DateTime time;
+    try {
+      time = DateFormat('yyyy-MM-dd HH:mm:ss').parse(entry.timestamp);
+    } catch (_) {
+      time = DateTime.now();
+    }
+
+    return LogEntry(
+      id: 0,
+      time: time,
+      method: entry.method,
+      path: entry.path,
+      model: entry.model,
+      targetEndpoint: entry.forwardTo,
+      statusCode: entry.statusCode,
+      requestDurationMs: entry.durationMs ?? 0,
+      firstByteDurationMs: entry.firstByteMs,
+      status: entry.statusCode != null && entry.statusCode! >= 400
+          ? LogStatus.error
+          : LogStatus.completed,
+      parsedRequest: entry.request,
+      parsedResponse: entry.response,
+    );
   }
 }
 
