@@ -342,17 +342,20 @@ class _LogPageState extends ConsumerState<LogPage> {
   }
 
   Future<void> _exportLogs(LogState state) async {
-    final dir = await FilePicker.getDirectoryPath(
-      dialogTitle: '选择导出目录',
+    final result = await FilePicker.saveFile(
+      dialogTitle: '选择导出文件',
+      fileName: 'logs_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.log',
+      type: FileType.custom,
+      allowedExtensions: ['log'],
     );
-    if (dir == null) return;
+    if (result == null) return;
 
     final notifier = ref.read(logProvider.notifier);
-    await notifier.exportLogs(dir);
+    await notifier.exportLogs(result);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已导出 ${state.filteredEntries.length} 条日志到 $dir')),
+        SnackBar(content: Text('已导出 ${state.filteredEntries.length} 条日志到 $result')),
       );
     }
   }

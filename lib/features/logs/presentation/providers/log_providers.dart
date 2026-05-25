@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:llm_proxy/features/logs/data/datasources/log_file_parser.dart';
 import 'package:llm_proxy/features/logs/data/datasources/log_file_exporter.dart';
+import 'package:llm_proxy/features/logs/data/datasources/log_file_parser.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_stats.dart';
@@ -419,27 +419,11 @@ class LogNotifier extends Notifier<LogState> {
     await _repo.clearLogs();
   }
 
-  Future<void> exportLogs(String dirPath) async {
-    final writer = LogFileExporter();
-    writer.setLogFileDir(dirPath);
-    writer.setSplitByEndpoint(false);
-
-    final entries = state.filteredEntries;
-    for (final entry in entries) {
-      await writer.writeLog(
-        time: entry.time,
-        method: entry.method,
-        path: entry.path,
-        requestBody: entry.requestBody,
-        statusCode: entry.statusCode ?? 0,
-        responseBody: entry.responseBody,
-        error: entry.error,
-        model: entry.model,
-        targetEndpoint: entry.targetEndpoint,
-        requestDurationMs: entry.requestDurationMs,
-        firstByteMs: entry.firstByteDurationMs,
-      );
-    }
+  Future<void> exportLogs(String filePath) async {
+    await LogFileExporter.exportToFile(
+      filePath: filePath,
+      entries: state.filteredEntries,
+    );
   }
 
   Future<int> importLogs(String filePath) async {

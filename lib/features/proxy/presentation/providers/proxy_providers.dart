@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:llm_proxy/features/logs/data/datasources/log_file_exporter.dart';
 import 'package:llm_proxy/features/proxy/data/datasources/proxy_server_datasource.dart';
 import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
 import 'package:llm_proxy/features/logs/data/repositories/drift_log_repository.dart';
@@ -28,23 +27,17 @@ final requestForwarderProvider = Provider<RequestForwarder>((ref) {
   return RequestForwarder();
 });
 
-final logFileWriterProvider = Provider<LogFileExporter>((ref) {
-  return LogFileExporter();
-});
-
 final proxyServerDataSourceProvider = Provider<ProxyServerDataSource>((ref) {
   final logRepo = ref.read(logRepositoryProvider);
   final ruleMatcher = ref.read(ruleMatcherProvider);
   final transformer = ref.read(requestTransformerProvider);
   final forwarder = ref.read(requestForwarderProvider);
-  final logWriter = ref.read(logFileWriterProvider);
   final ruleRepo = ref.read(ruleRepositoryProvider);
   final activeNotifier = ref.read(activeRequestsProvider.notifier);
   return ProxyServerDataSource(
     ruleMatcher: ruleMatcher,
     transformer: transformer,
     forwarder: forwarder,
-    logWriter: logWriter,
     logRepository: logRepo,
     ruleRepository: ruleRepo,
     onRequestStart: (info) => activeNotifier.register(info),
@@ -94,7 +87,6 @@ class ProxyNotifier extends Notifier<ProxyState> {
           certPath: settings.certPath,
           keyPath: settings.keyPath,
         );
-        dataSource.setLogFileDir(settings.logFileDir);
         state = state.copyWith(isRunning: true, isLoading: false);
       } catch (e) {
         state = state.copyWith(isRunning: false, isLoading: false, error: e.toString());

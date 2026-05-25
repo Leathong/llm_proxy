@@ -2,104 +2,66 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 
-import 'package:path/path.dart' as p;
+import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
 
-/// 代理请求/响应日志写入器。
-/// 按模型名（+ 可选的 endpoint ID）分文件写入日志目录。
+/// 日志文件导出器。
+/// 将日志条目追加写入到指定的单个文件。
 class LogFileExporter {
-  String? _logFileDir;
-  bool _splitByEndpoint = true;
-
-  /// 更新日志目录路径（空字符串或 null 表示不写入文件）
-  void setLogFileDir(String dir) {
-    _logFileDir = dir.isEmpty ? null : dir;
-  }
-
-  /// 设置是否按 endpoint 分割日志文件
-  void setSplitByEndpoint(bool split) {
-    _splitByEndpoint = split;
-  }
-
-  /// 写入一条完整的请求-响应日志
-  Future<void> writeLog({
-    required DateTime time,
-    required String method,
-    required String path,
-    required String? requestBody,
-    required int statusCode,
-    String? responseBody,
-    String? error,
-    String? targetEndpoint,
-    String? model,
-    int? requestDurationMs,
-    int? firstByteMs,
-    int? endpointId,
+  /// 将多条日志条目写入指定文件（追加模式）
+  static Future<void> exportToFile({
+    required String filePath,
+    required List<LogEntry> entries,
   }) async {
-    if (_logFileDir == null) return;
+    if (entries.isEmpty) return;
 
-    try {
-      final filePath = _buildFilePath(model, endpointId);
-      final file = File(filePath);
-      await file.parent.create(recursive: true);
+    final file = File(filePath);
+    await file.parent.create(recursive: true);
 
-      final buf = StringBuffer();
-      final separator = '${'-' * 20} ${_formatTime(time)} ${'-' * 20}';
+    final buf = StringBuffer();
+    for (final entry in entries) {
+      final separator = '${'-' * 20} ${_formatTime(entry.time)} ${'-' * 20}';
       buf.writeln(separator);
-      buf.writeln('[REQUEST] $method $path');
+      buf.writeln('[REQUEST] ${entry.method} ${entry.path}');
 
-      if (model != null) buf.writeln('[Model] $model');
-      if (targetEndpoint != null) buf.writeln('[Forward To] $targetEndpoint');
-      if (requestDurationMs != null) buf.writeln('[Duration] ${requestDurationMs}ms');
-      if (firstByteMs != null) buf.writeln('[First Byte] ${firstByteMs}ms');
-      buf.writeln('[Status] $statusCode');
+      if (entry.model != null) buf.writeln('[Model] ${entry.model}');
+      if (entry.targetEndpoint != null) buf.writeln('[Forward To] ${entry.targetEndpoint}');
+      buf.writeln('[Duration] ${entry.requestDurationMs}ms');
+      if (entry.firstByteDurationMs != null) buf.writeln('[First Byte] ${entry.firstByteDurationMs}ms');
+      buf.writeln('[Status] ${entry.statusCode ?? 0}');
 
-      if (requestBody != null && requestBody.isNotEmpty) {
+      if (entry.requestBody != null && entry.requestBody!.isNotEmpty) {
         buf.writeln('[Request Body]');
-        buf.writeln(_formatJson(requestBody));
+        buf.writeln(_formatJson(entry.requestBody!));
       }
 
-      if (responseBody != null && responseBody.isNotEmpty) {
+      if (entry.responseBody != null && entry.responseBody!.isNotEmpty) {
         buf.writeln('[Response Body]');
-        buf.writeln(_formatJson(responseBody));
+        buf.writeln(_formatJson(entry.responseBody!));
       }
 
-      if (error != null && error.isNotEmpty) {
-        buf.writeln('[Error] $error');
+      if (entry.error != null && entry.error!.isNotEmpty) {
+        buf.writeln('[Error] ${entry.error}');
       }
 
       buf.writeln();
+    }
+
+    try {
       await file.writeAsString(buf.toString(), mode: FileMode.append);
     } catch (e) {
-      developer.log('[LogFileWriter] 写入日志文件失败: $e');
+      developer.log('[LogFileExporter] 写入日志文件失败: $e');
     }
   }
 
-  /// 根据 model 和 endpointId 生成文件路径
-  String _buildFilePath(String? model, int? endpointId) {
-    final safeModel = _safeFileName(model ?? '_models');
-    if (_splitByEndpoint) {
-      final epId = endpointId?.toString() ?? '_unknown';
-      return p.join(_logFileDir!, '${safeModel}_$epId.log');
-    }
-    return p.join(_logFileDir!, '$safeModel.log');
-  }
-
-  /// 文件名安全处理：替换非法字符，截断过长名称
-  String _safeFileName(String name) {
-    var safe = name.replaceAll(RegExp(r'[\/\\:*?"<>|]'), '_');
-    if (safe.length > 100) safe = safe.substring(0, 100);
-    return safe;
-  }
-
-  String _formatTime(DateTime dt) {
+  static String _formatTime(DateTime dt) {
     return '${dt.year}-${_pad(dt.month)}-${_pad(dt.day)} '
         '${_pad(dt.hour)}:${_pad(dt.minute)}:${_pad(dt.second)}.'
         '${dt.millisecond.toString().padLeft(3, '0')}';
   }
 
-  String _pad(int n) => n.toString().padLeft(2, '0');
+  static String _pad(int n) => n.toString().padLeft(2, '0');
 
-  String _formatJson(String raw) {
+  static String _formatJson(String raw) {
     try {
       final decoded = jsonDecode(raw);
       return const JsonEncoder.withIndent('  ').convert(decoded);
