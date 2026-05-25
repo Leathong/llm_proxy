@@ -202,11 +202,17 @@ class LogNotifier extends Notifier<LogState> {
     }
   }
 
+  bool get _isFilterOrRangeActive =>
+      !state.filter.isEmpty ||
+      state.rangeStart != null ||
+      state.rangeEnd != null;
+
   Future<void> _handleLogAdded(int newId) async {
     if (state.isLoading) {
       _reloadAll();
       return;
     }
+    if (_isFilterOrRangeActive) return;
     try {
       final newLog = await _repo.getLog(newId);
       if (newLog == null) {
@@ -236,6 +242,7 @@ class LogNotifier extends Notifier<LogState> {
       _reloadAll();
       return;
     }
+    if (_isFilterOrRangeActive) return;
     try {
       final updatedLog = await _repo.getLog(updatedId);
       if (updatedLog == null) {
@@ -261,6 +268,7 @@ class LogNotifier extends Notifier<LogState> {
 
   void _handleLogDeleted(List<int> deletedIds) {
     if (state.isLoading) return;
+    if (_isFilterOrRangeActive) return;
     final s = state;
     final idsSet = deletedIds.toSet();
     final newEntries = s.allEntries.where((e) => !idsSet.contains(e.id)).toList();
