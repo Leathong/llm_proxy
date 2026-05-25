@@ -6,11 +6,15 @@ import 'package:llm_proxy/features/logs/presentation/widgets/log_detail.dart';
 class LogItem extends StatefulWidget {
   final FileLogEntry entry;
   final bool subtractFirstByte;
+  final bool isExpanded;
+  final VoidCallback onToggleExpanded;
 
   const LogItem({
     super.key,
     required this.entry,
     required this.subtractFirstByte,
+    required this.isExpanded,
+    required this.onToggleExpanded,
   });
 
   @override
@@ -22,6 +26,26 @@ class _LogItemState extends State<LogItem> {
   final _key = GlobalKey();
 
   FileLogEntry get entry => widget.entry;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isExpanded) {
+      _controller.expand();
+    }
+  }
+
+  @override
+  void didUpdateWidget(LogItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isExpanded != oldWidget.isExpanded) {
+      if (widget.isExpanded) {
+        _controller.expand();
+      } else {
+        _controller.collapse();
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -61,6 +85,7 @@ class _LogItemState extends State<LogItem> {
       });
     }
     _collapsingByUs = false;
+    widget.onToggleExpanded();
   }
 
   /// 从 response content 中提取文本预览，用于标题行快速定位

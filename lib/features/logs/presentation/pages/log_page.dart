@@ -190,6 +190,8 @@ class _LogPageState extends ConsumerState<LogPage> {
                     return LogItem(
                       entry: _toFileLogEntry(item.entry, item.seq),
                       subtractFirstByte: state.subtractFirstByte,
+                      isExpanded: item.isExpanded,
+                      onToggleExpanded: () => _notifier.toggleExpanded(item.entry.id),
                     );
                   },
                 )

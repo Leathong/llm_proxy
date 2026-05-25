@@ -62,6 +62,32 @@ class LogFilter {
 }
 
 const int pageSizeConst = 20;
+
+/// 显示列表中的条目，携带序号和展开状态
+class DisplayEntry {
+  final LogEntry entry;
+  final int seq;
+  final bool isExpanded;
+
+  const DisplayEntry({
+    required this.entry,
+    required this.seq,
+    this.isExpanded = false,
+  });
+
+  DisplayEntry copyWith({
+    LogEntry? entry,
+    int? seq,
+    bool? isExpanded,
+  }) {
+    return DisplayEntry(
+      entry: entry ?? this.entry,
+      seq: seq ?? this.seq,
+      isExpanded: isExpanded ?? this.isExpanded,
+    );
+  }
+}
+
 class LogState {
   final List<LogEntry> allEntries;
   final bool isLoading;
@@ -79,8 +105,8 @@ class LogState {
   /// 数据库中的总日志条数
   final int totalCount;
 
-  /// 缓存当前过滤/排序后的显示列表，每个元素携带在 allEntries 中的真实序号
-  final List<({LogEntry entry, int seq})> displayEntries;
+  /// 缓存当前过滤/排序后的显示列表，每个元素携带在 allEntries 中的真实序号和展开状态
+  final List<DisplayEntry> displayEntries;
 
   const LogState({
     this.allEntries = const [],
@@ -113,7 +139,7 @@ class LogState {
     LogStats? stats,
     int? pageSize,
     int? totalCount,
-    List<({LogEntry entry, int seq})>? displayEntries,
+    List<DisplayEntry>? displayEntries,
     bool clearRange = false,
     bool clearError = false,
     bool clearStats = false,
@@ -252,8 +278,20 @@ class LogNotifier extends Notifier<LogState> {
         ? rangeEntries
         : rangeEntries.where(s.filter.matches).toList();
     final all = s.allEntries;
+    final idToIndex = <int, int>{};
+    for (var i = 0; i < all.length; i++) {
+      idToIndex[all[i].id] = i;
+    }
+    final oldDisplay = s.displayEntries;
+    final oldExpanded = {
+      for (final d in oldDisplay) d.entry.id: d.isExpanded,
+    };
     final display = (s.reversed ? filtered.reversed.toList() : filtered)
-        .map((e) => (entry: e, seq: all.indexOf(e) + 1))
+        .map((e) => DisplayEntry(
+              entry: e,
+              seq: idToIndex[e.id]! + 1,
+              isExpanded: oldExpanded[e.id] ?? false,
+            ))
         .toList();
     state = state.copyWith(displayEntries: display);
   }
@@ -287,19 +325,8 @@ class LogNotifier extends Notifier<LogState> {
     if (s.isLoadingMore || !s.hasMore) return;
     state = state.copyWith(isLoadingMore: true);
     try {
-      if (s.allEntries.isEmpty) {
-        final entries = await _repo.getLogs(limit: s.pageSize, desc: true);
-        state = state.copyWith(
-          allEntries: entries,
-          isLoadingMore: false,
-          hasMore: entries.length >= s.pageSize,
-        );
-        _rebuildDisplay();
-        _computeStats();
-        return;
-      }
       final pageSize = s.pageSize;
-      final lastId = s.allEntries.last.id;
+      final lastId = s.allEntries.lastOrNull?.id;
       final more = await _repo.getLogs(
         limit: pageSize,
         desc: true,
@@ -374,6 +401,17 @@ class LogNotifier extends Notifier<LogState> {
   void setSubtractFirstByte(bool v) {
     state = state.copyWith(subtractFirstByte: v);
     _computeStats();
+  }
+
+  /// 切换指定日志条目的展开/收起状态
+  void toggleExpanded(int entryId) {
+    final newDisplay = state.displayEntries.map((d) {
+      if (d.entry.id == entryId) {
+        return d.copyWith(isExpanded: !d.isExpanded);
+      }
+      return d;
+    }).toList();
+    state = state.copyWith(displayEntries: newDisplay);
   }
 
   void setFilter(LogFilter filter) {
