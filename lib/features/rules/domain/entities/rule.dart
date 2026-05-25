@@ -11,6 +11,7 @@ class Rule {
   final String thinkingMode;
   final String reasoningEffort;
   final bool convertThinkingToContent;
+  final int? systemPromptId;
 
   const Rule({
     required this.id,
@@ -23,6 +24,7 @@ class Rule {
     this.thinkingMode = '',
     this.reasoningEffort = '',
     this.convertThinkingToContent = false,
+    this.systemPromptId,
   });
 
   List<EndpointConfig> get activeEndpoints =>
@@ -39,6 +41,7 @@ class Rule {
     String? thinkingMode,
     String? reasoningEffort,
     bool? convertThinkingToContent,
+    int? systemPromptId,
   }) {
     return Rule(
       id: id ?? this.id,
@@ -51,6 +54,7 @@ class Rule {
       thinkingMode: thinkingMode ?? this.thinkingMode,
       reasoningEffort: reasoningEffort ?? this.reasoningEffort,
       convertThinkingToContent: convertThinkingToContent ?? this.convertThinkingToContent,
+      systemPromptId: systemPromptId ?? this.systemPromptId,
     );
   }
 }

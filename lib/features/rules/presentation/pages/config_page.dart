@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
 import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.dart';
 import 'package:llm_proxy/features/rules/presentation/widgets/rule_edit_dialog.dart';
+import 'package:llm_proxy/features/rules/presentation/widgets/system_prompt_manager_dialog.dart';
 
 /// 默认分组名（groupName 为空时归入此组）
 const _kDefaultGroup = '默认';
@@ -78,7 +79,9 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
       data: (rules) {
         if (rules.isEmpty) {
           return Scaffold(
-            appBar: AppBar(),
+            appBar: AppBar(
+              actions: [_buildSystemPromptAction()],
+            ),
             body: const Center(child: Text('暂无代理规则，请点击右下角添加')),
             floatingActionButton: _buildFab(),
           );
@@ -95,6 +98,7 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
               tabAlignment: TabAlignment.start,
               tabs: _groups.map((g) => Tab(text: g)).toList(),
             ),
+            actions: [_buildSystemPromptAction()],
           ),
           body: TabBarView(
             controller: _tabController,
@@ -138,6 +142,21 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
           ),
           floatingActionButton: _buildFab(),
         );
+      },
+    );
+  }
+
+  Widget _buildSystemPromptAction() {
+    return IconButton(
+      icon: const Icon(Icons.article_outlined),
+      tooltip: '管理 System Prompt',
+      onPressed: () async {
+        await showDialog(
+          context: context,
+          builder: (_) => const SystemPromptManagerDialog(),
+        );
+        if (!context.mounted) return;
+        ref.invalidate(systemPromptsProvider);
       },
     );
   }

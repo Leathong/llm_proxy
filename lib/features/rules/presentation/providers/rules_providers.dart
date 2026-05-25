@@ -1,7 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:llm_proxy/core/database/app_database.dart' hide Rule, Endpoint;
+import 'package:llm_proxy/core/database/app_database.dart' hide Rule, Endpoint, SystemPrompt;
 import 'package:llm_proxy/features/rules/domain/entities/endpoint_config.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
+import 'package:llm_proxy/features/rules/domain/entities/system_prompt.dart';
 import 'package:llm_proxy/features/rules/domain/repositories/rule_repository.dart';
 import 'package:llm_proxy/features/rules/data/repositories/drift_rule_repository.dart';
 import 'package:llm_proxy/features/settings/presentation/providers/settings_providers.dart';
@@ -56,3 +57,34 @@ final allEndpointsProvider = FutureProvider<List<EndpointConfig>>((ref) {
   final repo = ref.watch(ruleRepositoryProvider);
   return repo.getAllEndpoints();
 });
+
+class SystemPromptsNotifier extends AsyncNotifier<List<SystemPrompt>> {
+  @override
+  Future<List<SystemPrompt>> build() async {
+    final repo = ref.watch(ruleRepositoryProvider);
+    return repo.getSystemPrompts();
+  }
+
+  Future<void> add(SystemPrompt prompt) async {
+    final repo = ref.read(ruleRepositoryProvider);
+    await repo.addSystemPrompt(prompt);
+    ref.invalidateSelf();
+  }
+
+  Future<void> updatePrompt(SystemPrompt prompt) async {
+    final repo = ref.read(ruleRepositoryProvider);
+    await repo.updateSystemPrompt(prompt);
+    ref.invalidateSelf();
+  }
+
+  Future<void> delete(int id) async {
+    final repo = ref.read(ruleRepositoryProvider);
+    await repo.deleteSystemPrompt(id);
+    ref.invalidateSelf();
+  }
+}
+
+final systemPromptsProvider =
+    AsyncNotifierProvider<SystemPromptsNotifier, List<SystemPrompt>>(
+  SystemPromptsNotifier.new,
+);

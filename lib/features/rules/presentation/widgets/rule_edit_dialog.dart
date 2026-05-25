@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_proxy/features/rules/domain/entities/endpoint_config.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
 import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.dart';
+import 'package:llm_proxy/features/rules/presentation/widgets/system_prompt_manager_dialog.dart';
 
 class RuleEditDialog extends ConsumerStatefulWidget {
   final Rule? rule;
@@ -23,6 +24,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
   late String _thinkingMode;
   late String _reasoningEffort;
   late bool _convertThinkingToContent;
+  int? _systemPromptId;
 
   late List<_EndpointEntry> _endpoints;
 
@@ -37,6 +39,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
     _thinkingMode = widget.rule?.thinkingMode ?? '';
     _reasoningEffort = widget.rule?.reasoningEffort ?? '';
     _convertThinkingToContent = widget.rule?.convertThinkingToContent ?? false;
+    _systemPromptId = widget.rule?.systemPromptId;
 
     if (widget.rule != null && widget.rule!.endpoints.isNotEmpty) {
       _endpoints = widget.rule!.endpoints
@@ -107,6 +110,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
       thinkingMode: _thinkingMode,
       reasoningEffort: _reasoningEffort,
       convertThinkingToContent: _convertThinkingToContent,
+      systemPromptId: _systemPromptId,
     );
   }
 
@@ -214,6 +218,8 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                         setState(() => _convertThinkingToContent = val),
                   ),
                 ),
+                const SizedBox(height: 8),
+                _buildSystemPromptSelector(),
                 Transform.scale(
                   scale: 0.75,
                   child: SwitchListTile(
@@ -262,6 +268,49 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
             }
           },
           child: const Text('保存'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSystemPromptSelector() {
+    final promptsAsync = ref.watch(systemPromptsProvider);
+    final prompts = promptsAsync.asData?.value ?? [];
+
+    return Row(
+      children: [
+        Expanded(
+          child: DropdownButtonFormField<int?>(
+            initialValue: _systemPromptId,
+            decoration: const InputDecoration(
+              labelText: 'System Prompt',
+              hintText: '不使用',
+            ),
+            items: [
+              const DropdownMenuItem<int?>(
+                value: null,
+                child: Text('不使用'),
+              ),
+              ...prompts.map((p) => DropdownMenuItem<int?>(
+                    value: p.id,
+                    child: Text(p.name, overflow: TextOverflow.ellipsis),
+                  )),
+            ],
+            onChanged: (val) => setState(() => _systemPromptId = val),
+            onSaved: (val) => _systemPromptId = val,
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.settings, size: 20),
+          tooltip: '管理 System Prompt',
+          onPressed: () async {
+            await showDialog(
+              context: context,
+              builder: (_) => const SystemPromptManagerDialog(),
+            );
+            if (!context.mounted) return;
+            ref.invalidate(systemPromptsProvider);
+          },
         ),
       ],
     );

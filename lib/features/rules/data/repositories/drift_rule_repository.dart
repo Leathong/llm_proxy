@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:llm_proxy/core/database/app_database.dart' as db;
 import 'package:llm_proxy/features/rules/domain/entities/endpoint_config.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart' as entity;
+import 'package:llm_proxy/features/rules/domain/entities/system_prompt.dart';
 import 'package:llm_proxy/features/rules/domain/repositories/rule_repository.dart';
 
 class DriftRuleRepository implements RuleRepository {
@@ -78,6 +79,7 @@ class DriftRuleRepository implements RuleRepository {
         thinkingMode: rule.thinkingMode,
         reasoningEffort: rule.reasoningEffort,
         convertThinkingToContent: rule.convertThinkingToContent,
+        systemPromptId: rule.systemPromptId,
       );
     }).toList();
 
@@ -98,6 +100,7 @@ class DriftRuleRepository implements RuleRepository {
             thinkingMode: Value(rule.thinkingMode),
             reasoningEffort: Value(rule.reasoningEffort),
             convertThinkingToContent: Value(rule.convertThinkingToContent),
+            systemPromptId: Value(rule.systemPromptId),
           ));
 
       final resolvedEndpoints = <EndpointConfig>[];
@@ -150,6 +153,7 @@ class DriftRuleRepository implements RuleRepository {
         thinkingMode: rule.thinkingMode,
         reasoningEffort: rule.reasoningEffort,
         convertThinkingToContent: rule.convertThinkingToContent,
+        systemPromptId: rule.systemPromptId,
       );
     });
   }
@@ -169,6 +173,7 @@ class DriftRuleRepository implements RuleRepository {
           thinkingMode: Value(rule.thinkingMode),
           reasoningEffort: Value(rule.reasoningEffort),
           convertThinkingToContent: Value(rule.convertThinkingToContent),
+          systemPromptId: Value(rule.systemPromptId),
         ),
       );
 
@@ -263,6 +268,50 @@ class DriftRuleRepository implements RuleRepository {
   @override
   Future<void> deleteEndpoint(int id) async {
     await (_db.delete(_db.endpoints)..where((e) => e.id.equals(id))).go();
+  }
+
+  @override
+  Future<List<SystemPrompt>> getSystemPrompts() async {
+    final rows = await (_db.select(_db.systemPrompts)
+          ..orderBy([(e) => OrderingTerm.desc(e.createdAt)]))
+        .get();
+    return rows
+        .map((e) => SystemPrompt(
+              id: e.id,
+              name: e.name,
+              content: e.content,
+            ))
+        .toList();
+  }
+
+  @override
+  Future<SystemPrompt> addSystemPrompt(SystemPrompt prompt) async {
+    final id = await _db.into(_db.systemPrompts).insert(
+          db.SystemPromptsCompanion.insert(
+            name: prompt.name,
+            content: prompt.content,
+          ),
+        );
+    return SystemPrompt(
+      id: id,
+      name: prompt.name,
+      content: prompt.content,
+    );
+  }
+
+  @override
+  Future<void> updateSystemPrompt(SystemPrompt prompt) async {
+    await (_db.update(_db.systemPrompts)
+          ..where((e) => e.id.equals(prompt.id)))
+        .write(db.SystemPromptsCompanion(
+      name: Value(prompt.name),
+      content: Value(prompt.content),
+    ));
+  }
+
+  @override
+  Future<void> deleteSystemPrompt(int id) async {
+    await (_db.delete(_db.systemPrompts)..where((e) => e.id.equals(id))).go();
   }
 
   @override

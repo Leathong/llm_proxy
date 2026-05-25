@@ -34,6 +34,17 @@ class Rules extends Table {
       text().withDefault(const Constant(''))();
   BoolColumn get convertThinkingToContent =>
       boolean().withDefault(const Constant(false))();
+  IntColumn get systemPromptId =>
+      integer().nullable().references(SystemPrompts, #id)();
+  DateTimeColumn get createdAt =>
+      dateTime().withDefault(currentDateAndTime)();
+}
+
+/// System Prompt 模板，可被多个规则引用
+class SystemPrompts extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text()();
+  TextColumn get content => text()();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
 }
@@ -110,7 +121,7 @@ class ProxyLogs extends Table {
 
 // ──────────────────────────── 数据库 ────────────────────────────
 
-@DriftDatabase(tables: [Endpoints, Rules, RuleEndpoints, ProxyLogs])
+@DriftDatabase(tables: [Endpoints, Rules, RuleEndpoints, ProxyLogs, SystemPrompts])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -119,7 +130,7 @@ class AppDatabase extends _$AppDatabase {
   String get databaseFilePath => _dbFilePath;
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -227,6 +238,20 @@ class AppDatabase extends _$AppDatabase {
             // 将 time 列从秒级时间戳转为毫秒级
             await customStatement(
               'UPDATE proxy_logs SET time = time * 1000 WHERE time < 100000000000',
+            );
+          }
+          if (from < 7) {
+            await customStatement('''
+              CREATE TABLE IF NOT EXISTS system_prompts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
+              )
+            ''');
+            await customStatement(
+              "ALTER TABLE rules ADD COLUMN system_prompt_id "
+              'INTEGER REFERENCES system_prompts(id)',
             );
           }
         },

@@ -220,7 +220,24 @@ class RequestRouter {
       final selectedEndpoint = matchResult.endpoint;
       logger.log('匹配到规则: ${rule.name}, 负载均衡选中 endpoint: ${selectedEndpoint.url}');
 
-      transformer.transform(bodyJson, rule: rule, requestUri: request.uri, onLog: logger.log);
+      // 如果规则关联了 system prompt，加载其内容
+      String? systemPromptContent;
+      if (rule.systemPromptId != null) {
+        final prompts = await ruleRepository.getSystemPrompts();
+        final matched = prompts.where((p) => p.id == rule.systemPromptId).toList();
+        if (matched.isNotEmpty) {
+          systemPromptContent = matched.first.content;
+          logger.log('已加载 system prompt: ${matched.first.name}');
+        }
+      }
+
+      transformer.transform(
+        bodyJson,
+        rule: rule,
+        requestUri: request.uri,
+        systemPromptContent: systemPromptContent,
+        onLog: logger.log,
+      );
       final modifiedBodyStr = jsonEncode(bodyJson);
       final newBodyBytes = utf8.encode(modifiedBodyStr);
       final targetUrl = transformer.buildTargetUrl(selectedEndpoint.url, endpoint);
