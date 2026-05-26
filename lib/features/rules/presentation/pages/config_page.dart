@@ -171,9 +171,11 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
       icon: const Icon(Icons.cloud_outlined),
       tooltip: '管理 Model Provider',
       onPressed: () async {
-        await showDialog(
-          context: context,
-          builder: (_) => const ModelProviderManagerDialog(),
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const ModelProviderManagerPage(),
+          ),
         );
         if (!context.mounted) return;
         ref.invalidate(modelProvidersProvider);
