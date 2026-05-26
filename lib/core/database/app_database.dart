@@ -52,6 +52,7 @@ class Rules extends Table {
   TextColumn get targetModelId => text()();
   IntColumn get providerModelId =>
       integer().nullable().references(ProviderModels, #id)();
+  TextColumn get providerModelName => text().withDefault(const Constant(''))();
   BoolColumn get active => boolean().withDefault(const Constant(true))();
   TextColumn get thinkingMode => text().withDefault(const Constant(''))();
   TextColumn get reasoningEffort =>
@@ -155,12 +156,14 @@ class AppDatabase extends _$AppDatabase {
   String get databaseFilePath => _dbFilePath;
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (migrator, from, to) async {
-          
+          if (from < 2) {
+            await migrator.addColumn(rules, rules.providerModelName);
+          }
         },
       );
 }

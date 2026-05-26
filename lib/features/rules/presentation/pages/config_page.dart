@@ -160,6 +160,9 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
   }
 
   String _buildRuleSubtitle(Rule rule) {
+    if (rule.providerModelName.isNotEmpty) {
+      return '${rule.customModelId} -> ${rule.providerModelName}';
+    }
     if (rule.providerModelId != null) {
       return '${rule.customModelId} -> ProviderModel #${rule.providerModelId}';
     }

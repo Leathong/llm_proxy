@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_proxy/core/widgets/scaled_switch.dart';
+import 'package:llm_proxy/features/rules/domain/entities/provider_model.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
 import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.dart';
 import 'package:llm_proxy/features/rules/presentation/widgets/system_prompt_manager_dialog.dart';
@@ -43,6 +44,23 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
   }
 
   Rule _buildRule({int? overrideId}) {
+    // 构建关联模型名称，用于直接展示，避免二次查找
+    String providerModelName = '';
+    if (_providerModelId != null) {
+      final providerModelsAsync = ref.read(allProviderModelsProvider);
+      final providersAsync = ref.read(modelProvidersProvider);
+      final models = providerModelsAsync.asData?.value ?? [];
+      final providers = providersAsync.asData?.value ?? [];
+      final selectedModel = models.where((m) => m.id == _providerModelId).firstOrNull;
+      if (selectedModel != null) {
+        final pName = providers
+            .where((p) => p.id == selectedModel.providerId)
+            .firstOrNull
+            ?.name ?? 'Provider #${selectedModel.providerId}';
+        providerModelName = '$pName / ${selectedModel.modelId}';
+      }
+    }
+
     return Rule(
       id: overrideId ?? widget.rule?.id ?? 0,
       name: _name,
@@ -50,6 +68,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
       customModelId: _customModelId,
       targetModelId: _targetModelId,
       providerModelId: _providerModelId,
+      providerModelName: providerModelName,
       active: _active,
       thinkingMode: _thinkingMode,
       reasoningEffort: _reasoningEffort,
@@ -207,36 +226,48 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
           providerFormatMap[p.id] = p.format;
         }
 
+        // 按 providerId 分组
+        final groupedModels = <int, List<ProviderModel>>{};
+        for (final m in enabledModels) {
+          groupedModels.putIfAbsent(m.providerId, () => []).add(m);
+        }
+
+        // 获取选中模型的显示文本
+        String? selectedText;
+        if (_providerModelId != null) {
+          final selectedModel = enabledModels
+              .where((m) => m.id == _providerModelId)
+              .firstOrNull;
+          if (selectedModel != null) {
+            final pName = providerNameMap[selectedModel.providerId] ??
+                'Provider #${selectedModel.providerId}';
+            selectedText = '$pName / ${selectedModel.modelId}';
+          }
+        }
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            DropdownButtonFormField<int?>(
-              initialValue: _providerModelId,
-              decoration: const InputDecoration(
-                labelText: '关联模型',
-                hintText: '请选择 Provider 模型',
+            // 点击弹出分组选择器
+            InkWell(
+              onTap: () => _showGroupedModelPicker(
+                groupedModels,
+                providerNameMap,
+                providerFormatMap,
               ),
-              validator: (val) =>
-                  val == null ? '请选择关联模型' : null,
-              items: [
-                const DropdownMenuItem<int?>(
-                  value: null,
-                  child: Text('请选择...'),
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: '关联模型',
+                  hintText: '请选择 Provider 模型',
+                  suffixIcon: Icon(Icons.arrow_drop_down),
                 ),
-                ...enabledModels.map((m) {
-                  final providerName =
-                      providerNameMap[m.providerId] ?? 'Provider #${m.providerId}';
-                  final format =
-                      providerFormatMap[m.providerId] ?? '';
-                  return DropdownMenuItem<int?>(
-                    value: m.id,
-                    child: Text('$providerName / ${m.modelId}  [$format]',
-                        overflow: TextOverflow.ellipsis),
-                  );
-                }),
-              ],
-              onChanged: (val) => setState(() => _providerModelId = val),
-              onSaved: (val) => _providerModelId = val,
+                child: Text(
+                  selectedText ?? '请选择...',
+                  style: TextStyle(
+                    color: selectedText != null ? null : Colors.grey[600],
+                  ),
+                ),
+              ),
             ),
             if (_providerModelId != null) ...[
               const SizedBox(height: 4),
@@ -245,6 +276,79 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                 style: TextStyle(fontSize: 11, color: Colors.grey[600]),
               ),
             ],
+          ],
+        );
+      },
+    );
+  }
+
+  void _showGroupedModelPicker(
+    Map<int, List<ProviderModel>> groupedModels,
+    Map<int, String> providerNameMap,
+    Map<int, String> providerFormatMap,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('选择模型'),
+          content: SizedBox(
+            width: 400,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: groupedModels.entries.map((entry) {
+                  final providerId = entry.key;
+                  final models = entry.value;
+                  final providerName =
+                      providerNameMap[providerId] ?? 'Provider #$providerId';
+                  final format = providerFormatMap[providerId] ?? '';
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ExpansionTile(
+                      title: Text(
+                        '$providerName  [$format]',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text('${models.length} 个模型'),
+                      initiallyExpanded: models.any(
+                        (m) => m.id == _providerModelId,
+                      ),
+                      children: models.map((m) {
+                        final isSelected = m.id == _providerModelId;
+                        return ListTile(
+                          title: Text(
+                            m.modelId,
+                            style: TextStyle(
+                              fontWeight:
+                                  isSelected ? FontWeight.bold : FontWeight.normal,
+                              color: isSelected
+                                  ? Theme.of(ctx).colorScheme.primary
+                                  : null,
+                            ),
+                          ),
+                          leading: isSelected
+                              ? Icon(Icons.check,
+                                  color: Theme.of(ctx).colorScheme.primary)
+                              : const SizedBox(width: 24),
+                          onTap: () {
+                            setState(() => _providerModelId = m.id);
+                            Navigator.pop(ctx);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('取消'),
+            ),
           ],
         );
       },

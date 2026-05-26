@@ -5,6 +5,7 @@ class Rule {
   final String customModelId;
   final String targetModelId;
   final int? providerModelId;
+  final String providerModelName;
   final bool active;
   final String thinkingMode;
   final String reasoningEffort;
@@ -18,6 +19,7 @@ class Rule {
     required this.customModelId,
     required this.targetModelId,
     this.providerModelId,
+    this.providerModelName = '',
     this.active = true,
     this.thinkingMode = '',
     this.reasoningEffort = '',
@@ -32,6 +34,7 @@ class Rule {
     String? customModelId,
     String? targetModelId,
     int? providerModelId,
+    String? providerModelName,
     bool? active,
     String? thinkingMode,
     String? reasoningEffort,
@@ -45,6 +48,7 @@ class Rule {
       customModelId: customModelId ?? this.customModelId,
       targetModelId: targetModelId ?? this.targetModelId,
       providerModelId: providerModelId ?? this.providerModelId,
+      providerModelName: providerModelName ?? this.providerModelName,
       active: active ?? this.active,
       thinkingMode: thinkingMode ?? this.thinkingMode,
       reasoningEffort: reasoningEffort ?? this.reasoningEffort,
