@@ -24,28 +24,39 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
   /// 当前各分组名列表（有序，默认组在最前）
   List<String> _groups = [];
 
-  /// 根据规则列表构建分组并同步 TabController
-  void _syncTabs(List<Rule> rules) {
+  /// 根据规则列表和已保存的顺序构建分组并同步 TabController
+  void _syncTabs(List<Rule> rules, List<String> savedOrder) {
     final groupSet = <String>{};
     for (final r in rules) {
       groupSet.add(r.groupName.isEmpty ? _kDefaultGroup : r.groupName);
     }
 
-    // 保证"默认"在最前，其余按字母排序
-    final sorted = groupSet.toList()
-      ..sort((a, b) {
-        if (a == _kDefaultGroup) return -1;
-        if (b == _kDefaultGroup) return 1;
-        return a.compareTo(b);
-      });
+    // 按已保存的顺序排列分组，未在保存顺序中的新分组追加到末尾
+    final ordered = <String>[];
+    for (final g in savedOrder) {
+      if (groupSet.contains(g)) {
+        ordered.add(g);
+        groupSet.remove(g);
+      }
+    }
+    // 追加新分组（按字母排序）
+    final newGroups = groupSet.toList()..sort();
+    ordered.addAll(newGroups);
+
+    // 如果分组有增减，持久化新的顺序
+    final hasChanges = newGroups.isNotEmpty ||
+        savedOrder.any((g) => !ordered.contains(g));
+    if (hasChanges && ordered.isNotEmpty) {
+      ref.read(groupOrderProvider.notifier).saveOrder(ordered);
+    }
 
     // 仅在分组列表变化时重建 TabController
-    if (_listEquals(sorted, _groups)) return;
+    if (_listEquals(ordered, _groups)) return;
 
     final oldIndex = _tabController?.index ?? 0;
     _tabController?.dispose();
 
-    _groups = sorted;
+    _groups = ordered;
     _tabController = TabController(
       length: _groups.length,
       vsync: this,
@@ -70,6 +81,7 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
   @override
   Widget build(BuildContext context) {
     final rulesAsync = ref.watch(rulesProvider);
+    final savedOrder = ref.watch(groupOrderProvider);
 
     return rulesAsync.when(
       loading: () => const Scaffold(
@@ -92,11 +104,10 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
           );
         }
 
-        _syncTabs(rules);
+        _syncTabs(rules, savedOrder);
 
         return Scaffold(
           appBar: AppBar(
-            // 用 TabBar 替换原来的 title
             title: TabBar(
               controller: _tabController,
               isScrollable: true,
@@ -104,6 +115,7 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
               tabs: _groups.map((g) => Tab(text: g)).toList(),
             ),
             actions: [
+              _buildReorderAction(),
               _buildProviderAction(),
               _buildSystemPromptAction(),
             ],
@@ -167,6 +179,14 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
       return '${rule.customModelId} -> ProviderModel #${rule.providerModelId}';
     }
     return '${rule.customModelId} -> ${rule.targetModelId} (未关联 Provider)';
+  }
+
+  Widget _buildReorderAction() {
+    return IconButton(
+      icon: const Icon(Icons.reorder),
+      tooltip: '编辑分组顺序',
+      onPressed: _showReorderDialog,
+    );
   }
 
   Widget _buildProviderAction() {
@@ -233,6 +253,57 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
             child: const Text('删除', style: TextStyle(color: Colors.red)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showReorderDialog() {
+    // 复制当前分组列表，避免直接修改
+    final items = List<String>.from(_groups);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: const Text('编辑分组顺序'),
+            content: SizedBox(
+              width: 300,
+              child: items.isEmpty
+                  ? const Text('暂无分组')
+                  : ReorderableListView.builder(
+                      shrinkWrap: true,
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        return ListTile(
+                          key: ValueKey(items[index]),
+                          title: Text(items[index]),
+                          leading: const Icon(Icons.drag_handle),
+                        );
+                      },
+                      onReorderItem: (oldIndex, newIndex) {
+                        setDialogState(() {
+                          final item = items.removeAt(oldIndex);
+                          items.insert(newIndex, item);
+                        });
+                      },
+                    ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () {
+                  ref.read(groupOrderProvider.notifier).saveOrder(items);
+                  Navigator.pop(ctx);
+                },
+                child: const Text('保存'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

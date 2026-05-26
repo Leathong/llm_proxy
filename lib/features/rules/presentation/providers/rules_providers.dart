@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_proxy/core/database/app_database.dart'
     hide Rule, Endpoint, SystemPrompt, ModelProvider, ProviderModel;
@@ -132,3 +134,32 @@ final providerModelsProvider =
   final repo = ref.watch(ruleRepositoryProvider);
   return repo.getProviderModels(providerId);
 });
+
+// ──────────────────────────── GroupOrder ────────────────────────────
+
+const _groupOrderKey = 'ruleGroupOrder';
+
+class GroupOrderNotifier extends Notifier<List<String>> {
+  @override
+  List<String> build() {
+    final prefs = ref.watch(sharedPreferencesProvider);
+    final raw = prefs.getString(_groupOrderKey);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        return (jsonDecode(raw) as List).cast<String>();
+      } catch (_) {
+        return [];
+      }
+    }
+    return [];
+  }
+
+  Future<void> saveOrder(List<String> order) async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs.setString(_groupOrderKey, jsonEncode(order));
+    ref.invalidateSelf();
+  }
+}
+
+final groupOrderProvider =
+    NotifierProvider<GroupOrderNotifier, List<String>>(GroupOrderNotifier.new);

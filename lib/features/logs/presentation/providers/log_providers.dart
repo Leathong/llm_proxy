@@ -268,7 +268,6 @@ class LogNotifier extends Notifier<LogState> {
 
   void _handleLogDeleted(List<int> deletedIds) {
     if (state.isLoading) return;
-    if (_isFilterOrRangeActive) return;
     final s = state;
     final idsSet = deletedIds.toSet();
     final newEntries = s.allEntries.where((e) => !idsSet.contains(e.id)).toList();
