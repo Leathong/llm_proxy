@@ -70,12 +70,63 @@ class SseParser {
   }
 
   /// 将非流式 JSON 响应转为 SseParseResult
+  /// 支持 OpenAI 格式（choices[0].message.content）和 Anthropic 格式（content blocks）
   static SseParseResult _jsonToResult(
     String type,
     Map<String, dynamic> data,
   ) {
+    List<Map<String, dynamic>>? blocks;
+
+    // 尝试 Anthropic 格式：data.content 为 content blocks 数组
     final contentList = data['content'] as List<dynamic>?;
-    final blocks = contentList?.whereType<Map<String, dynamic>>().toList();
+    if (contentList != null) {
+      blocks = contentList.whereType<Map<String, dynamic>>().toList();
+    }
+
+    // 尝试 OpenAI 格式：data.choices[0].message.content
+    if (blocks == null || blocks.isEmpty) {
+      final choices = data['choices'] as List<dynamic>?;
+      if (choices != null && choices.isNotEmpty) {
+        final firstChoice = choices.first;
+        if (firstChoice is Map<String, dynamic>) {
+          final message = firstChoice['message'] as Map<String, dynamic>?;
+          if (message != null) {
+            final text = message['content'] as String?;
+            if (text != null && text.isNotEmpty) {
+              blocks = [FileLogContentBlock(type: 'text', text: text).toJson()];
+            }
+            // 处理 tool_calls
+            final toolCalls = message['tool_calls'] as List<dynamic>?;
+            if (toolCalls != null) {
+              blocks ??= [];
+              for (final tc in toolCalls) {
+                if (tc is Map<String, dynamic>) {
+                  final func = tc['function'] as Map<String, dynamic>?;
+                  Map<String, dynamic>? parsedInput;
+                  if (func != null) {
+                    try {
+                      parsedInput = jsonDecode(
+                        func['arguments'] as String? ?? '',
+                      ) as Map<String, dynamic>;
+                    } catch (_) {}
+                  }
+                  blocks.add(FileLogContentBlock(
+                    type: 'tool_use',
+                    id: tc['id'] as String?,
+                    name: func?['name'] as String?,
+                    input: parsedInput,
+                  ).toJson());
+                }
+              }
+            }
+          }
+          // 提取 finish_reason
+          if (data['stop_reason'] == null) {
+            data['stop_reason'] = firstChoice['finish_reason'] as String?;
+          }
+        }
+      }
+    }
 
     return SseParseResult(
       type: type,
