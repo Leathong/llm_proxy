@@ -32,12 +32,14 @@ class _MessageBubble extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
+      child: Material(
         color: roleColor.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: roleColor.withValues(alpha: 0.15)),
-      ),
-      child: ExpansionTile(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: roleColor.withValues(alpha: 0.15)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: ExpansionTile(
         dense: true,
         tilePadding: const EdgeInsets.symmetric(horizontal: 12),
         leading: Icon(roleIcon, size: 18, color: roleColor),
@@ -146,7 +148,8 @@ class _MessageBubble extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   String _previewText() {

@@ -75,13 +75,7 @@ class SseParser {
     Map<String, dynamic> data,
   ) {
     final contentList = data['content'] as List<dynamic>?;
-    List<Map<String, dynamic>>? blocks;
-    if (contentList != null) {
-      blocks = contentList
-          .whereType<Map<String, dynamic>>()
-          .map((c) => FileLogContentBlock.fromJson(c).toJson())
-          .toList();
-    }
+    final blocks = contentList?.whereType<Map<String, dynamic>>().toList();
 
     return SseParseResult(
       type: type,

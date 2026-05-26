@@ -188,6 +188,7 @@ class _LogPageState extends ConsumerState<LogPage> {
                     }
                     final item = displayEntries[index];
                     return LogItem(
+                      key: ValueKey(item.entry.id),
                       entry: _toFileLogEntry(item.entry, item.seq),
                       subtractFirstByte: state.subtractFirstByte,
                       isExpanded: item.isExpanded,

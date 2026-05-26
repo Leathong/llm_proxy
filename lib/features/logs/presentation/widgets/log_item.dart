@@ -39,11 +39,13 @@ class _LogItemState extends State<LogItem> {
   void didUpdateWidget(LogItem oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isExpanded != oldWidget.isExpanded) {
+      _syncingFromWidget = true;
       if (widget.isExpanded) {
         _controller.expand();
       } else {
         _controller.collapse();
       }
+      _syncingFromWidget = false;
     }
   }
 
@@ -55,6 +57,9 @@ class _LogItemState extends State<LogItem> {
 
   /// 标记是否由我们主动触发收起（区分 title 点击收起 vs GestureDetector 收起）
   bool _collapsingByUs = false;
+
+  /// 标记是否正在由 didUpdateWidget 同步 controller 状态，抑制 onExpansionChanged
+  bool _syncingFromWidget = false;
 
   /// 点击展开内容区域收起：先滚回可视区域，再执行收起
   Future<void> _scrollThenCollapse() async {
@@ -72,6 +77,7 @@ class _LogItemState extends State<LogItem> {
 
   /// 处理 ExpansionTile 通过 title 点击触发的收起（非我们主动触发时补偿滚动）
   void _onExpansionChanged(bool expanded) {
+    if (_syncingFromWidget) return;
     if (!expanded && !_collapsingByUs) {
       Future.delayed(const Duration(milliseconds: 250), () {
         final ctx = _key.currentContext;

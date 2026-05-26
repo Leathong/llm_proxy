@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:llm_proxy/features/logs/data/datasources/log_response_parser.dart';
+import 'package:llm_proxy/features/logs/data/datasources/request_body_parser.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
@@ -14,9 +14,6 @@ import 'package:llm_proxy/features/proxy/domain/services/request_forwarder.dart'
 import 'package:llm_proxy/features/proxy/domain/services/request_transformer.dart';
 import 'package:llm_proxy/features/proxy/domain/services/rule_matcher.dart';
 import 'package:llm_proxy/features/rules/domain/repositories/rule_repository.dart';
-
-Map<String, dynamic> _parseRequestBodyIsolate(String rawJson) =>
-    LogResponseParser.parseRequestBody(rawJson);
 
 SseParseResult _parseResponseBodyIsolate(Map<String, String> params) =>
     SseParser.parseResponse(params['body']!, params['path']!);
@@ -52,6 +49,41 @@ class RequestRouter {
   void dispose() {
     _logWriteSub?.cancel();
     _logWriteController.close();
+  }
+
+  /// 从已修改的 bodyJson 构建结构化请求日志
+  FileLogRequest? _buildParsedRequest(Map<String, dynamic> bodyJson) {
+    final model = bodyJson['model'] as String?;
+    if (model == null) return null;
+
+    final messages = <FileLogMessage>[];
+    if (bodyJson['messages'] is List) {
+      for (final msg in bodyJson['messages'] as List) {
+        if (msg is Map<String, dynamic>) {
+          messages.add(RequestBodyParser.simplifyMessage(msg, truncate: false));
+        }
+      }
+    }
+
+    final (_, systemFull) = RequestBodyParser.extractSystem(bodyJson['system']);
+
+    final tools = RequestBodyParser.extractToolDefs(bodyJson['tools']);
+
+    final extras = Map<String, dynamic>.from(bodyJson)
+      ..remove('model')
+      ..remove('stream')
+      ..remove('messages')
+      ..remove('system')
+      ..remove('tools');
+
+    return FileLogRequest(
+      model: model,
+      stream: bodyJson['stream'] as bool?,
+      messages: messages,
+      systemFull: systemFull,
+      tools: tools,
+      otherParams: extras.isNotEmpty ? extras : null,
+    );
   }
 
   Future<void> handle(HttpRequest request) async {
@@ -164,8 +196,6 @@ class RequestRouter {
         return;
       }
 
-      final parsedReqFuture = compute(_parseRequestBodyIsolate, bodyString);
-
       logId = await logRepository.addLog(LogEntry(
         id: 0,
         time: startTime,
@@ -273,27 +303,10 @@ class RequestRouter {
         'path': endpoint,
       });
 
-      final parsedReqMap = await parsedReqFuture;
       final parsedRespResult = await parsedRespFuture;
 
-      FileLogRequest? parsedReq;
-      if (parsedReqMap.isNotEmpty && parsedReqMap['model'] != null) {
-        final msgs = (parsedReqMap['messages'] as List?)
-                ?.map((m) => FileLogMessage.fromJson(m as Map<String, dynamic>))
-                .toList() ??
-            [];
-        final tools = (parsedReqMap['tools'] as List?)
-            ?.map((t) => FileLogToolDef.fromJson(t as Map<String, dynamic>))
-            .toList();
-        parsedReq = FileLogRequest(
-          model: parsedReqMap['model'] as String?,
-          stream: parsedReqMap['stream'] as bool?,
-          messages: msgs,
-          systemFull: parsedReqMap['system_prompt'] as String?,
-          tools: tools,
-          otherParams: parsedReqMap['other_params'] as Map<String, dynamic>?,
-        );
-      }
+      // 使用 transform 后的 bodyJson 构建结构化请求日志
+      final parsedReq = _buildParsedRequest(bodyJson);
 
       FileLogResponse? parsedResp;
       if (parsedRespResult.type != null && parsedRespResult.type != 'empty' && parsedRespResult.type != 'raw') {
