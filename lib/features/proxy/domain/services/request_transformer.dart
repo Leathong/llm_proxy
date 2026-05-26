@@ -47,11 +47,8 @@ class RequestTransformer {
     String? systemPromptContent,
     void Function(String message)? onLog,
   ) {
-    // thinking 注入（OpenAI 方式：reasoning_effort）
-    if (rule.thinkingMode == 'enabled' && rule.reasoningEffort.isNotEmpty) {
-      bodyJson['reasoning_effort'] = rule.reasoningEffort;
-      onLog?.call('注入 reasoning_effort: ${rule.reasoningEffort}');
-    }
+    // thinking 注入
+    _injectThinking(bodyJson, rule, onLog);
 
     // system prompt 替换（OpenAI 方式：messages[role=system]）
     if (systemPromptContent != null && systemPromptContent.isNotEmpty) {
@@ -75,11 +72,8 @@ class RequestTransformer {
     String? systemPromptContent,
     void Function(String message)? onLog,
   ) {
-    // thinking 注入（Anthropic 方式：thinking type）
-    if (rule.thinkingMode.isNotEmpty) {
-      bodyJson['thinking'] = {'type': rule.thinkingMode};
-      onLog?.call('注入 thinking: ${rule.thinkingMode}');
-    }
+    // thinking 注入
+    _injectThinking(bodyJson, rule, onLog);
 
     // system prompt 替换（Anthropic 方式：顶层 system 字段）
     if (systemPromptContent != null && systemPromptContent.isNotEmpty) {
@@ -102,5 +96,25 @@ class RequestTransformer {
         onLog?.call('已替换 Anthropic 格式 system prompt (content blocks)');
       }
     }
+  }
+}
+
+void _injectThinking(
+  Map<String, dynamic> bodyJson,
+  Rule rule,
+  void Function(String message)? onLog,
+) {
+  // 使用规则中的 thinking 配置
+  if (rule.thinkingMode.isNotEmpty) {
+    bodyJson['thinking'] = {'type': rule.thinkingMode};
+    final enableThinking = rule.thinkingMode == "enabled";
+    bodyJson['extra_body'] = {'enable_thinking': enableThinking};
+    bodyJson['enable_thinking'] = enableThinking;
+    onLog?.call('注入 thinking: ${rule.thinkingMode}');
+  }
+
+  if (rule.thinkingMode == 'enabled' && rule.reasoningEffort.isNotEmpty) {
+    bodyJson['reasoning_effort'] = rule.reasoningEffort;
+    onLog?.call('注入 reasoning_effort: ${rule.reasoningEffort}');
   }
 }
