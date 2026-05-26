@@ -1,12 +1,10 @@
-import 'package:llm_proxy/features/rules/domain/entities/endpoint_config.dart';
-
 class Rule {
   final int id;
   final String name;
   final String groupName;
-  final List<EndpointConfig> endpoints;
   final String customModelId;
   final String targetModelId;
+  final int? providerModelId;
   final bool active;
   final String thinkingMode;
   final String reasoningEffort;
@@ -17,9 +15,9 @@ class Rule {
     required this.id,
     required this.name,
     this.groupName = '',
-    this.endpoints = const [],
     required this.customModelId,
     required this.targetModelId,
+    this.providerModelId,
     this.active = true,
     this.thinkingMode = '',
     this.reasoningEffort = '',
@@ -27,16 +25,13 @@ class Rule {
     this.systemPromptId,
   });
 
-  List<EndpointConfig> get activeEndpoints =>
-      endpoints.where((e) => e.active).toList();
-
   Rule copyWith({
     int? id,
     String? name,
     String? groupName,
-    List<EndpointConfig>? endpoints,
     String? customModelId,
     String? targetModelId,
+    int? providerModelId,
     bool? active,
     String? thinkingMode,
     String? reasoningEffort,
@@ -47,9 +42,9 @@ class Rule {
       id: id ?? this.id,
       name: name ?? this.name,
       groupName: groupName ?? this.groupName,
-      endpoints: endpoints ?? this.endpoints,
       customModelId: customModelId ?? this.customModelId,
       targetModelId: targetModelId ?? this.targetModelId,
+      providerModelId: providerModelId ?? this.providerModelId,
       active: active ?? this.active,
       thinkingMode: thinkingMode ?? this.thinkingMode,
       reasoningEffort: reasoningEffort ?? this.reasoningEffort,

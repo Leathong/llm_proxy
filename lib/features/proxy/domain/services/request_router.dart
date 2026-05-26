@@ -10,6 +10,7 @@ import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart'
 import 'package:llm_proxy/features/logs/domain/services/sse_parser.dart';
 import 'package:llm_proxy/features/proxy/domain/entities/active_request_info.dart';
 import 'package:llm_proxy/features/proxy/domain/services/proxy_logger.dart';
+import 'package:llm_proxy/features/proxy/domain/services/provider_format.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_forwarder.dart';
 import 'package:llm_proxy/features/proxy/domain/services/request_transformer.dart';
 import 'package:llm_proxy/features/proxy/domain/services/rule_matcher.dart';
@@ -100,12 +101,15 @@ class RequestRouter {
 
       if (path.endsWith('/v1/models')) {
         await _handleModels(request);
-      } else if (path == '/v1/chat/completions' || path == '/v1/messages') {
-        await _handleChatCompletions(request, endpoint: path);
       } else {
-        request.response.statusCode = HttpStatus.notFound;
-        request.response.write('Not Found');
-        await request.response.close();
+        final requestFormat = ProviderFormat.fromPath(path);
+        if (requestFormat != null) {
+          await _handleChatCompletions(request, requestFormat: requestFormat);
+        } else {
+          request.response.statusCode = HttpStatus.notFound;
+          request.response.write('Not Found');
+          await request.response.close();
+        }
       }
     } catch (e) {
       logger.log('处理请求出错: $e');
@@ -158,7 +162,9 @@ class RequestRouter {
     ));
   }
 
-  Future<void> _handleChatCompletions(HttpRequest request, {required String endpoint}) async {
+  Future<void> _handleChatCompletions(HttpRequest request, {
+    required ProviderFormat requestFormat,
+  }) async {
     final startTime = DateTime.now();
     var logId = 0;
 
@@ -204,7 +210,6 @@ class RequestRouter {
         model: requestedModelId,
         status: LogStatus.pending,
       ));
-      // pending 日志需要同步写入以确保 logId 可用，后续 update 可异步
 
       onRequestStart?.call(ActiveRequestInfo(
         logId: logId,
@@ -219,19 +224,14 @@ class RequestRouter {
       final matchResult = ruleMatcher.match(allRules, requestedModelId);
 
       if (matchResult == null) {
-        final hasRule = allRules.any((r) => r.active && r.customModelId == requestedModelId);
-        final errorMsg = hasRule ? 'No active endpoint' : 'Model not found';
-        final statusCode = hasRule ? HttpStatus.serviceUnavailable : HttpStatus.notFound;
-
+        final errorMsg = 'Model not found or not active: $requestedModelId';
         final errorResp = jsonEncode({
           'error': {
-            'message': hasRule
-                ? 'No active endpoint for model: $requestedModelId'
-                : 'Model not found or not active: $requestedModelId',
+            'message': errorMsg,
             'type': 'invalid_request_error',
           }
         });
-        request.response.statusCode = statusCode;
+        request.response.statusCode = HttpStatus.notFound;
         request.response.write(errorResp);
         await request.response.close();
 
@@ -239,7 +239,7 @@ class RequestRouter {
         unawaited(logRepository.updateLog(LogEntry(
           id: logId, time: startTime, method: request.method,
           path: request.uri.path, model: requestedModelId,
-          statusCode: statusCode, status: LogStatus.error, error: errorMsg,
+          statusCode: HttpStatus.notFound, status: LogStatus.error, error: errorMsg,
           requestDurationMs: duration,
         )));
         onRequestComplete?.call(logId);
@@ -247,8 +247,6 @@ class RequestRouter {
       }
 
       final rule = matchResult.rule;
-      final selectedEndpoint = matchResult.endpoint;
-      logger.log('匹配到规则: ${rule.name}, 负载均衡选中 endpoint: ${selectedEndpoint.url}');
 
       // 如果规则关联了 system prompt，加载其内容
       String? systemPromptContent;
@@ -261,22 +259,100 @@ class RequestRouter {
         }
       }
 
+      // 规则必须关联 providerModelId
+      if (rule.providerModelId == null) {
+        final errorResp = jsonEncode({
+          'error': {
+            'message': 'Rule "${rule.name}" has no provider model configured',
+            'type': 'invalid_request_error',
+          }
+        });
+        request.response.statusCode = HttpStatus.internalServerError;
+        request.response.write(errorResp);
+        await request.response.close();
+        return;
+      }
+
+      final providerModel = await ruleRepository.getProviderModelById(rule.providerModelId!);
+      if (providerModel == null) {
+        final errorResp = jsonEncode({
+          'error': {
+            'message': 'Provider model not found for rule: ${rule.name}',
+            'type': 'invalid_request_error',
+          }
+        });
+        request.response.statusCode = HttpStatus.internalServerError;
+        request.response.write(errorResp);
+        await request.response.close();
+        return;
+      }
+
+      final provider = await ruleRepository.getModelProviderById(providerModel.providerId);
+      if (provider == null) {
+        final errorResp = jsonEncode({
+          'error': {
+            'message': 'Model provider not found for rule: ${rule.name}',
+            'type': 'invalid_request_error',
+          }
+        });
+        request.response.statusCode = HttpStatus.internalServerError;
+        request.response.write(errorResp);
+        await request.response.close();
+        return;
+      }
+
+      final providerFormat = ProviderFormat.parse(provider.format) ?? ProviderFormat.openai;
+
+      // 格式校验：请求 path 格式必须与 Provider 配置的格式匹配
+      if (requestFormat != providerFormat) {
+        final errorMsg = 'Format mismatch: request path indicates ${requestFormat.name} '
+            'but provider "${provider.name}" is configured as ${providerFormat.name}';
+        logger.log(errorMsg);
+        final errorResp = jsonEncode({
+          'error': {
+            'message': errorMsg,
+            'type': 'invalid_request_error',
+          }
+        });
+        request.response.statusCode = HttpStatus.badRequest;
+        request.response.write(errorResp);
+        await request.response.close();
+
+        final duration = DateTime.now().difference(startTime).inMilliseconds;
+        unawaited(logRepository.updateLog(LogEntry(
+          id: logId, time: startTime, method: request.method,
+          path: request.uri.path, model: requestedModelId,
+          statusCode: HttpStatus.badRequest, status: LogStatus.error, error: errorMsg,
+          requestDurationMs: duration,
+        )));
+        onRequestComplete?.call(logId);
+        return;
+      }
+
+      final targetModelId = providerModel.modelId;
+      final apiKey = provider.apiKey;
+      final targetUrl = transformer.buildTargetUrl(
+        baseUrl: provider.baseUrl,
+        format: providerFormat,
+      );
+      logger.log('匹配到规则: ${rule.name}, Provider: ${provider.name}, 模型: $targetModelId');
+
       transformer.transform(
         bodyJson,
         rule: rule,
-        requestUri: request.uri,
+        targetModelId: targetModelId,
+        format: providerFormat,
         systemPromptContent: systemPromptContent,
         onLog: logger.log,
       );
       final modifiedBodyStr = jsonEncode(bodyJson);
       final newBodyBytes = utf8.encode(modifiedBodyStr);
-      final targetUrl = transformer.buildTargetUrl(selectedEndpoint.url, endpoint);
 
       final result = await forwarder.forward(
         clientRequest: request,
         targetUrl: targetUrl,
         bodyBytes: newBodyBytes,
-        endpointApiKey: selectedEndpoint.apiKey,
+        endpointApiKey: apiKey,
         convertThinkingToContent: rule.convertThinkingToContent,
       );
 
@@ -300,7 +376,7 @@ class RequestRouter {
 
       final parsedRespFuture = compute(_parseResponseBodyIsolate, {
         'body': result.responseBody ?? '',
-        'path': endpoint,
+        'path': request.uri.path,
       });
 
       final parsedRespResult = await parsedRespFuture;

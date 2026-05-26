@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:llm_proxy/features/rules/domain/entities/endpoint_config.dart';
+import 'package:llm_proxy/core/widgets/scaled_switch.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
 import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.dart';
 import 'package:llm_proxy/features/rules/presentation/widgets/system_prompt_manager_dialog.dart';
@@ -25,8 +25,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
   late String _reasoningEffort;
   late bool _convertThinkingToContent;
   int? _systemPromptId;
-
-  late List<_EndpointEntry> _endpoints;
+  int? _providerModelId;
 
   @override
   void initState() {
@@ -40,62 +39,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
     _reasoningEffort = widget.rule?.reasoningEffort ?? '';
     _convertThinkingToContent = widget.rule?.convertThinkingToContent ?? false;
     _systemPromptId = widget.rule?.systemPromptId;
-
-    if (widget.rule != null && widget.rule!.endpoints.isNotEmpty) {
-      _endpoints = widget.rule!.endpoints
-          .map((e) => _EndpointEntry(
-                endpoint: e,
-                active: e.active,
-              ))
-          .toList();
-    } else {
-      _endpoints = [];
-    }
-  }
-
-  void _removeEndpoint(int index) {
-    setState(() {
-      _endpoints.removeAt(index);
-    });
-  }
-
-  void _showEndpointPicker() async {
-    final allEndpoints = await ref.read(allEndpointsProvider.future);
-    if (!mounted) return;
-
-    final currentIds = _endpoints.map((e) => e.endpoint.id).toSet();
-
-    final available =
-        allEndpoints.where((e) => !currentIds.contains(e.id)).toList();
-
-    if (available.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('所有 Endpoint 都已添加')),
-      );
-      return;
-    }
-
-    final selected = await showDialog<List<EndpointConfig>>(
-      context: context,
-      builder: (ctx) => _EndpointPickerDialog(endpoints: available),
-    );
-
-    if (selected != null && selected.isNotEmpty) {
-      setState(() {
-        for (final ep in selected) {
-          _endpoints.add(_EndpointEntry(
-            endpoint: ep,
-            active: true,
-          ));
-        }
-      });
-    }
-  }
-
-  List<EndpointConfig> _buildEndpoints() {
-    return _endpoints
-        .map((e) => e.endpoint.copyWith(active: e.active))
-        .toList();
+    _providerModelId = widget.rule?.providerModelId;
   }
 
   Rule _buildRule({int? overrideId}) {
@@ -103,9 +47,9 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
       id: overrideId ?? widget.rule?.id ?? 0,
       name: _name,
       groupName: _groupName,
-      endpoints: _buildEndpoints(),
       customModelId: _customModelId,
       targetModelId: _targetModelId,
+      providerModelId: _providerModelId,
       active: _active,
       thinkingMode: _thinkingMode,
       reasoningEffort: _reasoningEffort,
@@ -150,33 +94,8 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                       val == null || val.isEmpty ? '请输入自定义模型 ID' : null,
                   onSaved: (val) => _customModelId = val!,
                 ),
-                TextFormField(
-                  initialValue: _targetModelId,
-                  decoration: const InputDecoration(
-                      labelText: '目标模型 ID (真实请求时使用)'),
-                  validator: (val) =>
-                      val == null || val.isEmpty ? '请输入目标模型 ID' : null,
-                  onSaved: (val) => _targetModelId = val!,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Endpoints (${_endpoints.length})',
-                        style: Theme.of(context).textTheme.titleSmall),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.add_circle_outline, size: 20),
-                          tooltip: '添加 Endpoint',
-                          onPressed: _showEndpointPicker,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                ..._buildEndpointWidgets(),
+                const SizedBox(height: 12),
+                _buildProviderModelSelector(),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   initialValue: _thinkingMode,
@@ -208,25 +127,19 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                   onSaved: (val) => _reasoningEffort = val ?? '',
                 ),
                 const SizedBox(height: 8),
-                Transform.scale(
-                  scale: 0.75,
-                  child: SwitchListTile(
-                    title: const Text('将模型思考转写为正常返回'),
-                    subtitle: const Text('开启后 thinking/reasoning 将作为 content 返回'),
-                    value: _convertThinkingToContent,
-                    onChanged: (val) =>
-                        setState(() => _convertThinkingToContent = val),
-                  ),
+                SwitchTile(
+                  title: const Text('将模型思考转写为正常返回'),
+                  subtitle: const Text('开启后 thinking/reasoning 将作为 content 返回'),
+                  value: _convertThinkingToContent,
+                  onChanged: (val) =>
+                      setState(() => _convertThinkingToContent = val),
                 ),
                 const SizedBox(height: 8),
                 _buildSystemPromptSelector(),
-                Transform.scale(
-                  scale: 0.75,
-                  child: SwitchListTile(
-                    title: const Text('启用规则'),
-                    value: _active,
-                    onChanged: (val) => setState(() => _active = val),
-                  ),
+                SwitchTile(
+                  title: const Text('启用规则'),
+                  value: _active,
+                  onChanged: (val) => setState(() => _active = val),
                 )
               ],
             ),
@@ -243,8 +156,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
               if (_formKey.currentState!.validate()) {
                 _formKey.currentState!.save();
                 final rule = _buildRule(overrideId: 0);
-                final endpoints = _buildEndpoints();
-                ref.read(rulesProvider.notifier).add(rule, endpoints);
+                ref.read(rulesProvider.notifier).add(rule);
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('已另存为新规则')),
@@ -258,11 +170,10 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
             if (_formKey.currentState!.validate()) {
               _formKey.currentState!.save();
               final rule = _buildRule();
-              final endpoints = _buildEndpoints();
               if (widget.rule == null) {
-                ref.read(rulesProvider.notifier).add(rule, endpoints);
+                ref.read(rulesProvider.notifier).add(rule);
               } else {
-                ref.read(rulesProvider.notifier).updateRule(rule, endpoints);
+                ref.read(rulesProvider.notifier).updateRule(rule);
               }
               Navigator.pop(context);
             }
@@ -273,9 +184,82 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
     );
   }
 
+  Widget _buildProviderModelSelector() {
+    final providerModelsAsync = ref.watch(allProviderModelsProvider);
+    final providersAsync = ref.watch(modelProvidersProvider);
+
+    return providerModelsAsync.when(
+      loading: () => const SizedBox(
+        height: 48,
+        child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))),
+      ),
+      error: (e, _) => Text('加载模型列表失败: $e',
+          style: const TextStyle(color: Colors.red, fontSize: 12)),
+      data: (providerModels) {
+        final enabledModels =
+            providerModels.where((m) => m.enabled).toList();
+
+        final providers = providersAsync.asData?.value ?? [];
+        final providerNameMap = <int, String>{};
+        final providerFormatMap = <int, String>{};
+        for (final p in providers) {
+          providerNameMap[p.id] = p.name;
+          providerFormatMap[p.id] = p.format;
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DropdownButtonFormField<int?>(
+              initialValue: _providerModelId,
+              decoration: const InputDecoration(
+                labelText: '关联模型',
+                hintText: '请选择 Provider 模型',
+              ),
+              validator: (val) =>
+                  val == null ? '请选择关联模型' : null,
+              items: [
+                const DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text('请选择...'),
+                ),
+                ...enabledModels.map((m) {
+                  final providerName =
+                      providerNameMap[m.providerId] ?? 'Provider #${m.providerId}';
+                  final format =
+                      providerFormatMap[m.providerId] ?? '';
+                  return DropdownMenuItem<int?>(
+                    value: m.id,
+                    child: Text('$providerName / ${m.modelId}  [$format]',
+                        overflow: TextOverflow.ellipsis),
+                  );
+                }),
+              ],
+              onChanged: (val) => setState(() => _providerModelId = val),
+              onSaved: (val) => _providerModelId = val,
+            ),
+            if (_providerModelId != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                '目标模型 ID 和转发地址由 Provider 配置决定',
+                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildSystemPromptSelector() {
     final promptsAsync = ref.watch(systemPromptsProvider);
     final prompts = promptsAsync.asData?.value ?? [];
+
+    // 防御性处理：如果 _systemPromptId 指向的 System Prompt 已被删除，重置为 null
+    if (_systemPromptId != null &&
+        !prompts.any((p) => p.id == _systemPromptId)) {
+      _systemPromptId = null;
+    }
 
     return Row(
       children: [
@@ -311,141 +295,6 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
             if (!context.mounted) return;
             ref.invalidate(systemPromptsProvider);
           },
-        ),
-      ],
-    );
-  }
-
-  List<Widget> _buildEndpointWidgets() {
-    return List.generate(_endpoints.length, (index) {
-      final ep = _endpoints[index];
-      return Card(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 14,
-                backgroundColor: Colors.blue.shade50,
-                child: Text('#${ep.endpoint.id}',
-                    style: TextStyle(fontSize: 10, color: Colors.blue.shade700)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(ep.endpoint.url,
-                        style: const TextStyle(fontSize: 13),
-                        overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 2),
-                    Text(
-                      ep.endpoint.apiKey.isEmpty
-                          ? '无 API Key'
-                          : 'Key: ${ep.endpoint.apiKey.substring(0, ep.endpoint.apiKey.length > 8 ? 8 : ep.endpoint.apiKey.length)}...',
-                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              ),
-              Transform.scale(
-                scale: 0.7,
-                child: Switch(
-                  value: ep.active,
-                  onChanged: (val) => setState(() => ep.active = val),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.remove_circle_outline, size: 18, color: Colors.red),
-                tooltip: '移除此 Endpoint',
-                onPressed: () => _removeEndpoint(index),
-              ),
-            ],
-          ),
-        ),
-      );
-    });
-  }
-}
-
-class _EndpointEntry {
-  final EndpointConfig endpoint;
-  bool active;
-
-  _EndpointEntry({
-    required this.endpoint,
-    required this.active,
-  });
-}
-
-class _EndpointPickerDialog extends StatefulWidget {
-  final List<EndpointConfig> endpoints;
-
-  const _EndpointPickerDialog({required this.endpoints});
-
-  @override
-  State<_EndpointPickerDialog> createState() =>
-      _EndpointPickerDialogState();
-}
-
-class _EndpointPickerDialogState
-    extends State<_EndpointPickerDialog> {
-  final Set<int> _selectedIds = {};
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('选择 Endpoint'),
-      content: SizedBox(
-        width: 450,
-        height: 400,
-        child: widget.endpoints.isEmpty
-            ? const Center(child: Text('没有可用的 Endpoint'))
-            : ListView.builder(
-                itemCount: widget.endpoints.length,
-                itemBuilder: (context, index) {
-                  final ep = widget.endpoints[index];
-                  final selected = _selectedIds.contains(ep.id);
-                  return CheckboxListTile(
-                    value: selected,
-                    onChanged: (val) {
-                      setState(() {
-                        if (val == true) {
-                          _selectedIds.add(ep.id);
-                        } else {
-                          _selectedIds.remove(ep.id);
-                        }
-                      });
-                    },
-                    title: Text(ep.url,
-                        style: const TextStyle(fontSize: 13)),
-                    subtitle: Text(
-                      ep.apiKey.isEmpty
-                          ? '无 API Key'
-                          : 'Key: ${ep.apiKey.substring(0, (ep.apiKey.length > 8 ? 8 : ep.apiKey.length))}...',
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                    dense: true,
-                  );
-                },
-              ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-        TextButton(
-          onPressed: _selectedIds.isEmpty
-              ? null
-              : () {
-                  final selected = widget.endpoints
-                      .where((e) => _selectedIds.contains(e.id))
-                      .toList();
-                  Navigator.pop(context, selected);
-                },
-          child: Text('添加 (${_selectedIds.length})'),
         ),
       ],
     );

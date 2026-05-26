@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:llm_proxy/core/widgets/scaled_switch.dart';
 import 'package:llm_proxy/features/settings/domain/entities/app_settings.dart';
 import 'package:llm_proxy/features/settings/presentation/providers/settings_providers.dart';
 
@@ -233,12 +234,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             Row(
               children: [
                 const Text('开启系统代理: ', style: TextStyle(fontSize: 16)),
-                Transform.scale(
-                  scale: 0.75,
-                  child: Switch(
-                    value: settings.enableSystemProxy,
-                    onChanged: (val) => ref.read(settingsProvider.notifier).setEnableSystemProxy(val),
-                  ),
+                ScaledSwitch(
+                  value: settings.enableSystemProxy,
+                  onChanged: (val) => ref.read(settingsProvider.notifier).setEnableSystemProxy(val),
                 ),
               ],
             ),

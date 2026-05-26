@@ -21,6 +21,28 @@ class Endpoints extends Table {
       dateTime().withDefault(currentDateAndTime)();
 }
 
+/// Model Provider 配置，存储上游 API 提供商信息
+class ModelProviders extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text()();
+  TextColumn get baseUrl => text()();
+  TextColumn get apiKey => text().withDefault(const Constant(''))();
+  TextColumn get format => text().withDefault(const Constant('openai'))();
+  DateTimeColumn get createdAt =>
+      dateTime().withDefault(currentDateAndTime)();
+}
+
+/// 从 Provider 获取并选择添加到本地的模型
+class ProviderModels extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get providerId => integer().references(ModelProviders, #id, onDelete: KeyAction.cascade)();
+  TextColumn get modelId => text()();
+  TextColumn get displayName => text().nullable()();
+  BoolColumn get enabled => boolean().withDefault(const Constant(true))();
+  DateTimeColumn get createdAt =>
+      dateTime().withDefault(currentDateAndTime)();
+}
+
 /// 代理规则
 class Rules extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -28,6 +50,8 @@ class Rules extends Table {
   TextColumn get groupName => text().withDefault(const Constant(''))();
   TextColumn get customModelId => text()();
   TextColumn get targetModelId => text()();
+  IntColumn get providerModelId =>
+      integer().nullable().references(ProviderModels, #id)();
   BoolColumn get active => boolean().withDefault(const Constant(true))();
   TextColumn get thinkingMode => text().withDefault(const Constant(''))();
   TextColumn get reasoningEffort =>
@@ -35,7 +59,8 @@ class Rules extends Table {
   BoolColumn get convertThinkingToContent =>
       boolean().withDefault(const Constant(false))();
   IntColumn get systemPromptId =>
-      integer().nullable().references(SystemPrompts, #id)();
+      integer().nullable().references(SystemPrompts, #id,
+          onDelete: KeyAction.setNull)();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
 }
@@ -121,7 +146,7 @@ class ProxyLogs extends Table {
 
 // ──────────────────────────── 数据库 ────────────────────────────
 
-@DriftDatabase(tables: [Endpoints, Rules, RuleEndpoints, ProxyLogs, SystemPrompts])
+@DriftDatabase(tables: [Endpoints, ModelProviders, ProviderModels, Rules, RuleEndpoints, ProxyLogs, SystemPrompts])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -130,130 +155,12 @@ class AppDatabase extends _$AppDatabase {
   String get databaseFilePath => _dbFilePath;
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 1;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (migrator, from, to) async {
-          if (from < 2) {
-            await customStatement(
-              "ALTER TABLE rules ADD COLUMN group_name TEXT NOT NULL DEFAULT ''",
-            );
-          }
-          if (from < 3) {
-            await customStatement(
-              "ALTER TABLE rules ADD COLUMN convert_thinking_to_content "
-              'INTEGER NOT NULL DEFAULT 0',
-            );
-          }
-          if (from < 4) {
-            await customStatement('''
-              CREATE TABLE IF NOT EXISTS proxy_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                method TEXT NOT NULL,
-                path TEXT NOT NULL,
-                time INTEGER NOT NULL,
-                model TEXT,
-                target_endpoint TEXT,
-                status_code INTEGER,
-                error TEXT,
-                request_duration_ms INTEGER,
-                first_byte_ms INTEGER,
-                status INTEGER NOT NULL,
-                request_body TEXT,
-                response_body TEXT,
-                request_model TEXT,
-                request_stream INTEGER,
-                request_messages_json TEXT,
-                request_system_prompt TEXT,
-                request_tools_json TEXT,
-                request_other_params_json TEXT,
-                response_model TEXT,
-                response_type TEXT,
-                stop_reason TEXT,
-                response_usage_json TEXT,
-                response_content_json TEXT,
-                response_id TEXT,
-                created_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
-              )
-            ''');
-          }
-          if (from < 5) {
-            await customStatement('''
-              CREATE TABLE proxy_logs_v5 (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                method TEXT NOT NULL,
-                path TEXT NOT NULL,
-                time INTEGER NOT NULL,
-                model TEXT,
-                target_endpoint TEXT,
-                status_code INTEGER,
-                error TEXT,
-                request_duration_ms INTEGER,
-                first_byte_ms INTEGER,
-                status INTEGER NOT NULL,
-                request_body TEXT,
-                response_body TEXT,
-                request_model TEXT,
-                request_stream INTEGER,
-                request_messages_json TEXT,
-                request_system_prompt TEXT,
-                request_tools_json TEXT,
-                request_other_params_json TEXT,
-                response_model TEXT,
-                response_type TEXT,
-                stop_reason TEXT,
-                response_usage_json TEXT,
-                response_content_json TEXT,
-                response_id TEXT,
-                created_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
-              )
-            ''');
-            await customStatement('''
-              INSERT INTO proxy_logs_v5 (
-                id, method, path, time, model, target_endpoint, status_code,
-                error, request_duration_ms, first_byte_ms, status,
-                request_body, response_body, request_model, request_stream,
-                request_messages_json, request_system_prompt, request_tools_json,
-                request_other_params_json, response_model, response_type,
-                stop_reason, response_usage_json, response_content_json,
-                response_id, created_at
-              )
-              SELECT
-                id, method, path, time, model, target_endpoint, status_code,
-                error, request_duration_ms, first_byte_ms, status,
-                request_body, response_body, request_model, request_stream,
-                request_messages_json, request_system_prompt, request_tools_json,
-                request_other_params_json, response_model, response_type,
-                stop_reason, response_usage_json, response_content_json,
-                response_id, created_at
-              FROM proxy_logs
-            ''');
-            await customStatement('DROP TABLE proxy_logs');
-            await customStatement(
-              'ALTER TABLE proxy_logs_v5 RENAME TO proxy_logs',
-            );
-          }
-          if (from < 6) {
-            // 将 time 列从秒级时间戳转为毫秒级
-            await customStatement(
-              'UPDATE proxy_logs SET time = time * 1000 WHERE time < 100000000000',
-            );
-          }
-          if (from < 7) {
-            await customStatement('''
-              CREATE TABLE IF NOT EXISTS system_prompts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                content TEXT NOT NULL,
-                created_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
-              )
-            ''');
-            await customStatement(
-              "ALTER TABLE rules ADD COLUMN system_prompt_id "
-              'INTEGER REFERENCES system_prompts(id)',
-            );
-          }
+          
         },
       );
 }

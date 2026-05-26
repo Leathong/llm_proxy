@@ -84,7 +84,6 @@ class ProxyServerDataSource {
     if (!isRunning) return;
     await _server!.close(force: true);
     _server = null;
-    _ruleMatcher.reset();
     _logger.log('代理服务器已停止');
   }
 }

@@ -3,7 +3,8 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:llm_proxy/core/database/app_database.dart' as db;
-import 'package:llm_proxy/features/rules/domain/entities/endpoint_config.dart';
+import 'package:llm_proxy/features/rules/domain/entities/model_provider.dart' as entity;
+import 'package:llm_proxy/features/rules/domain/entities/provider_model.dart' as entity;
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart' as entity;
 import 'package:llm_proxy/features/rules/domain/entities/system_prompt.dart';
 import 'package:llm_proxy/features/rules/domain/repositories/rule_repository.dart';
@@ -32,49 +33,14 @@ class DriftRuleRepository implements RuleRepository {
       return _cachedRules!;
     }
 
-    final ruleIds = rules.map((r) => r.id).toList();
-
-    final joins = await (_db.select(_db.ruleEndpoints)
-          ..where((re) => re.ruleId.isIn(ruleIds))
-          ..orderBy([(re) => OrderingTerm.asc(re.sortOrder)]))
-        .get();
-
-    final endpointIds = joins.map((j) => j.endpointId).toSet().toList();
-
-    final endpointsMap = <int, db.Endpoint>{};
-    if (endpointIds.isNotEmpty) {
-      final eps = await (_db.select(_db.endpoints)
-            ..where((e) => e.id.isIn(endpointIds)))
-          .get();
-      for (final ep in eps) {
-        endpointsMap[ep.id] = ep;
-      }
-    }
-
-    final joinsByRule = <int, List<db.RuleEndpoint>>{};
-    for (final j in joins) {
-      joinsByRule.putIfAbsent(j.ruleId, () => []).add(j);
-    }
-
     _cachedRules = rules.map((rule) {
-      final ruleJoins = joinsByRule[rule.id] ?? [];
-      final endpoints = ruleJoins.map((j) {
-        final ep = endpointsMap[j.endpointId];
-        return EndpointConfig(
-          id: j.endpointId,
-          url: ep?.url ?? '',
-          apiKey: ep?.apiKey ?? '',
-          active: j.active,
-        );
-      }).toList();
-
       return entity.Rule(
         id: rule.id,
         name: rule.name,
         groupName: rule.groupName,
-        endpoints: endpoints,
         customModelId: rule.customModelId,
         targetModelId: rule.targetModelId,
+        providerModelId: rule.providerModelId,
         active: rule.active,
         thinkingMode: rule.thinkingMode,
         reasoningEffort: rule.reasoningEffort,
@@ -87,131 +53,53 @@ class DriftRuleRepository implements RuleRepository {
   }
 
   @override
-  Future<entity.Rule> addRule(
-      entity.Rule rule, List<EndpointConfig> endpoints) async {
+  Future<entity.Rule> addRule(entity.Rule rule) async {
     _invalidateCache();
-    return _db.transaction(() async {
-      final ruleId = await _db.into(_db.rules).insert(db.RulesCompanion.insert(
-            name: rule.name,
-            groupName: Value(rule.groupName),
-            customModelId: rule.customModelId,
-            targetModelId: rule.targetModelId,
-            active: Value(rule.active),
-            thinkingMode: Value(rule.thinkingMode),
-            reasoningEffort: Value(rule.reasoningEffort),
-            convertThinkingToContent: Value(rule.convertThinkingToContent),
-            systemPromptId: Value(rule.systemPromptId),
-          ));
-
-      final resolvedEndpoints = <EndpointConfig>[];
-      for (var i = 0; i < endpoints.length; i++) {
-        final ep = endpoints[i];
-        int epId;
-
-        if (ep.id > 0) {
-          epId = ep.id;
-          await (_db.update(_db.endpoints)
-                ..where((e) => e.id.equals(epId)))
-              .write(db.EndpointsCompanion(
-            url: Value(ep.url),
-            apiKey: Value(ep.apiKey),
-          ));
-        } else {
-          epId = await _db
-              .into(_db.endpoints)
-              .insert(db.EndpointsCompanion.insert(
-                url: ep.url,
-                apiKey: Value(ep.apiKey),
-              ));
-        }
-
-        await _db.into(_db.ruleEndpoints).insert(
-              db.RuleEndpointsCompanion.insert(
-                ruleId: ruleId,
-                endpointId: epId,
-                active: Value(ep.active),
-                sortOrder: Value(i),
-              ),
-            );
-
-        resolvedEndpoints.add(EndpointConfig(
-          id: epId,
-          url: ep.url,
-          apiKey: ep.apiKey,
-          active: ep.active,
-        ));
-      }
-
-      return entity.Rule(
-        id: ruleId,
-        name: rule.name,
-        groupName: rule.groupName,
-        endpoints: resolvedEndpoints,
-        customModelId: rule.customModelId,
-        targetModelId: rule.targetModelId,
-        active: rule.active,
-        thinkingMode: rule.thinkingMode,
-        reasoningEffort: rule.reasoningEffort,
-        convertThinkingToContent: rule.convertThinkingToContent,
-        systemPromptId: rule.systemPromptId,
-      );
-    });
-  }
-
-  @override
-  Future<void> updateRule(
-      entity.Rule rule, List<EndpointConfig> endpoints) async {
-    _invalidateCache();
-    await _db.transaction(() async {
-      await (_db.update(_db.rules)..where((r) => r.id.equals(rule.id))).write(
-        db.RulesCompanion(
-          name: Value(rule.name),
+    final ruleId = await _db.into(_db.rules).insert(db.RulesCompanion.insert(
+          name: rule.name,
           groupName: Value(rule.groupName),
-          customModelId: Value(rule.customModelId),
-          targetModelId: Value(rule.targetModelId),
+          customModelId: rule.customModelId,
+          targetModelId: rule.targetModelId,
+          providerModelId: Value(rule.providerModelId),
           active: Value(rule.active),
           thinkingMode: Value(rule.thinkingMode),
           reasoningEffort: Value(rule.reasoningEffort),
           convertThinkingToContent: Value(rule.convertThinkingToContent),
           systemPromptId: Value(rule.systemPromptId),
-        ),
-      );
+        ));
 
-      await (_db.delete(_db.ruleEndpoints)
-            ..where((re) => re.ruleId.equals(rule.id)))
-          .go();
+    return entity.Rule(
+      id: ruleId,
+      name: rule.name,
+      groupName: rule.groupName,
+      customModelId: rule.customModelId,
+      targetModelId: rule.targetModelId,
+      providerModelId: rule.providerModelId,
+      active: rule.active,
+      thinkingMode: rule.thinkingMode,
+      reasoningEffort: rule.reasoningEffort,
+      convertThinkingToContent: rule.convertThinkingToContent,
+      systemPromptId: rule.systemPromptId,
+    );
+  }
 
-      for (var i = 0; i < endpoints.length; i++) {
-        final ep = endpoints[i];
-        int epId;
-
-        if (ep.id > 0) {
-          epId = ep.id;
-          await (_db.update(_db.endpoints)
-                ..where((e) => e.id.equals(epId)))
-              .write(db.EndpointsCompanion(
-            url: Value(ep.url),
-            apiKey: Value(ep.apiKey),
-          ));
-        } else {
-          epId = await _db
-              .into(_db.endpoints)
-              .insert(db.EndpointsCompanion.insert(
-                url: ep.url,
-                apiKey: Value(ep.apiKey),
-              ));
-        }
-
-        await _db.into(_db.ruleEndpoints).insert(
-              db.RuleEndpointsCompanion.insert(
-                ruleId: rule.id,
-                endpointId: epId,
-                active: Value(ep.active),
-                sortOrder: Value(i),
-              ),
-            );
-      }
-    });
+  @override
+  Future<void> updateRule(entity.Rule rule) async {
+    _invalidateCache();
+    await (_db.update(_db.rules)..where((r) => r.id.equals(rule.id))).write(
+      db.RulesCompanion(
+        name: Value(rule.name),
+        groupName: Value(rule.groupName),
+        customModelId: Value(rule.customModelId),
+        targetModelId: Value(rule.targetModelId),
+        providerModelId: Value(rule.providerModelId),
+        active: Value(rule.active),
+        thinkingMode: Value(rule.thinkingMode),
+        reasoningEffort: Value(rule.reasoningEffort),
+        convertThinkingToContent: Value(rule.convertThinkingToContent),
+        systemPromptId: Value(rule.systemPromptId),
+      ),
+    );
   }
 
   @override
@@ -225,49 +113,6 @@ class DriftRuleRepository implements RuleRepository {
     _invalidateCache();
     await (_db.update(_db.rules)..where((r) => r.id.equals(id)))
         .write(db.RulesCompanion(active: Value(active)));
-  }
-
-  @override
-  Future<List<EndpointConfig>> getAllEndpoints() async {
-    final rows = await (_db.select(_db.endpoints)
-          ..orderBy([(e) => OrderingTerm.desc(e.createdAt)]))
-        .get();
-    return rows
-        .map((e) => EndpointConfig(
-              id: e.id,
-              url: e.url,
-              apiKey: e.apiKey,
-            ))
-        .toList();
-  }
-
-  @override
-  Future<EndpointConfig> addEndpoint(EndpointConfig endpoint) async {
-    final id =
-        await _db.into(_db.endpoints).insert(db.EndpointsCompanion.insert(
-              url: endpoint.url,
-              apiKey: Value(endpoint.apiKey),
-            ));
-    return EndpointConfig(
-      id: id,
-      url: endpoint.url,
-      apiKey: endpoint.apiKey,
-    );
-  }
-
-  @override
-  Future<void> updateEndpoint(EndpointConfig endpoint) async {
-    await (_db.update(_db.endpoints)
-          ..where((e) => e.id.equals(endpoint.id)))
-        .write(db.EndpointsCompanion(
-      url: Value(endpoint.url),
-      apiKey: Value(endpoint.apiKey),
-    ));
-  }
-
-  @override
-  Future<void> deleteEndpoint(int id) async {
-    await (_db.delete(_db.endpoints)..where((e) => e.id.equals(id))).go();
   }
 
   @override
@@ -314,6 +159,174 @@ class DriftRuleRepository implements RuleRepository {
     await (_db.delete(_db.systemPrompts)..where((e) => e.id.equals(id))).go();
   }
 
+  // ──────────────────────────── ModelProvider CRUD ────────────────────────────
+
+  @override
+  Future<List<entity.ModelProvider>> getModelProviders() async {
+    final rows = await (_db.select(_db.modelProviders)
+          ..orderBy([(e) => OrderingTerm.desc(e.createdAt)]))
+        .get();
+    return rows
+        .map((e) => entity.ModelProvider(
+              id: e.id,
+              name: e.name,
+              baseUrl: e.baseUrl,
+              apiKey: e.apiKey,
+              format: e.format,
+            ))
+        .toList();
+  }
+
+  @override
+  Future<entity.ModelProvider> addModelProvider(
+      entity.ModelProvider provider) async {
+    final id = await _db.into(_db.modelProviders).insert(
+          db.ModelProvidersCompanion.insert(
+            name: provider.name,
+            baseUrl: provider.baseUrl,
+            apiKey: Value(provider.apiKey),
+            format: Value(provider.format),
+          ),
+        );
+    return entity.ModelProvider(
+      id: id,
+      name: provider.name,
+      baseUrl: provider.baseUrl,
+      apiKey: provider.apiKey,
+      format: provider.format,
+    );
+  }
+
+  @override
+  Future<void> updateModelProvider(entity.ModelProvider provider) async {
+    await (_db.update(_db.modelProviders)
+          ..where((e) => e.id.equals(provider.id)))
+        .write(db.ModelProvidersCompanion(
+      name: Value(provider.name),
+      baseUrl: Value(provider.baseUrl),
+      apiKey: Value(provider.apiKey),
+      format: Value(provider.format),
+    ));
+  }
+
+  @override
+  Future<void> deleteModelProvider(int id) async {
+    await (_db.delete(_db.modelProviders)..where((e) => e.id.equals(id)))
+        .go();
+  }
+
+  // ──────────────────────────── ProviderModel CRUD ────────────────────────────
+
+  @override
+  Future<List<entity.ProviderModel>> getProviderModels(int providerId) async {
+    final rows = await (_db.select(_db.providerModels)
+          ..where((e) => e.providerId.equals(providerId))
+          ..orderBy([(e) => OrderingTerm.desc(e.createdAt)]))
+        .get();
+    return rows
+        .map((e) => entity.ProviderModel(
+              id: e.id,
+              providerId: e.providerId,
+              modelId: e.modelId,
+              displayName: e.displayName,
+              enabled: e.enabled,
+            ))
+        .toList();
+  }
+
+  @override
+  Future<List<entity.ProviderModel>> getAllProviderModels() async {
+    final rows = await (_db.select(_db.providerModels)
+          ..orderBy([(e) => OrderingTerm.desc(e.createdAt)]))
+        .get();
+    return rows
+        .map((e) => entity.ProviderModel(
+              id: e.id,
+              providerId: e.providerId,
+              modelId: e.modelId,
+              displayName: e.displayName,
+              enabled: e.enabled,
+            ))
+        .toList();
+  }
+
+  @override
+  Future<entity.ProviderModel> addProviderModel(
+      entity.ProviderModel model) async {
+    final id = await _db.into(_db.providerModels).insert(
+          db.ProviderModelsCompanion.insert(
+            providerId: model.providerId,
+            modelId: model.modelId,
+            displayName: Value(model.displayName),
+            enabled: Value(model.enabled),
+          ),
+        );
+    return entity.ProviderModel(
+      id: id,
+      providerId: model.providerId,
+      modelId: model.modelId,
+      displayName: model.displayName,
+      enabled: model.enabled,
+    );
+  }
+
+  @override
+  Future<void> updateProviderModel(entity.ProviderModel model) async {
+    await (_db.update(_db.providerModels)
+          ..where((e) => e.id.equals(model.id)))
+        .write(db.ProviderModelsCompanion(
+      modelId: Value(model.modelId),
+      displayName: Value(model.displayName),
+      enabled: Value(model.enabled),
+    ));
+  }
+
+  @override
+  Future<void> deleteProviderModel(int id) async {
+    await (_db.delete(_db.providerModels)..where((e) => e.id.equals(id)))
+        .go();
+  }
+
+  @override
+  Future<void> toggleProviderModel(int id, bool enabled) async {
+    await (_db.update(_db.providerModels)..where((e) => e.id.equals(id)))
+        .write(db.ProviderModelsCompanion(enabled: Value(enabled)));
+  }
+
+  @override
+  Future<entity.ProviderModel?> getProviderModelById(int id) async {
+    final rows = await (_db.select(_db.providerModels)
+          ..where((e) => e.id.equals(id))
+          ..limit(1))
+        .get();
+    if (rows.isEmpty) return null;
+    final e = rows.first;
+    return entity.ProviderModel(
+      id: e.id,
+      providerId: e.providerId,
+      modelId: e.modelId,
+      displayName: e.displayName,
+      enabled: e.enabled,
+    );
+  }
+
+  @override
+  Future<entity.ModelProvider?> getModelProviderById(int id) async {
+    final rows = await (_db.select(_db.modelProviders)
+          ..where((e) => e.id.equals(id))
+          ..limit(1))
+        .get();
+    if (rows.isEmpty) return null;
+    final e = rows.first;
+    return entity.ModelProvider(
+      id: e.id,
+      name: e.name,
+      baseUrl: e.baseUrl,
+      apiKey: e.apiKey,
+      format: e.format,
+    );
+  }
+
   @override
   Future<void> migrateFromSharedPreferences() async {
     const key = 'proxyRules';
@@ -328,7 +341,7 @@ class DriftRuleRepository implements RuleRepository {
         final Map<String, dynamic> json =
             jsonDecode(jsonStr) as Map<String, dynamic>;
 
-        final ruleId = await _db.into(_db.rules).insert(
+        await _db.into(_db.rules).insert(
               db.RulesCompanion.insert(
                 name: json['name'] as String? ?? '',
                 customModelId: json['customModelId'] as String? ?? '',
@@ -339,46 +352,6 @@ class DriftRuleRepository implements RuleRepository {
                     Value(json['reasoningEffort'] as String? ?? ''),
               ),
             );
-
-        final endpointsList =
-            json['endpoints'] as List<dynamic>? ?? <dynamic>[];
-        final oldEndpoint = json['endpoint'] as String? ?? '';
-        final oldApiKey = json['apiKey'] as String? ?? '';
-
-        if (endpointsList.isNotEmpty) {
-          for (var i = 0; i < endpointsList.length; i++) {
-            final epJson = endpointsList[i] as Map<String, dynamic>;
-            final epId = await _db.into(_db.endpoints).insert(
-                  db.EndpointsCompanion.insert(
-                    url: epJson['url'] as String? ?? '',
-                    apiKey: Value(epJson['apiKey'] as String? ?? ''),
-                  ),
-                );
-            await _db.into(_db.ruleEndpoints).insert(
-                  db.RuleEndpointsCompanion.insert(
-                    ruleId: ruleId,
-                    endpointId: epId,
-                    active: Value(epJson['active'] as bool? ?? true),
-                    sortOrder: Value(i),
-                  ),
-                );
-          }
-        } else if (oldEndpoint.isNotEmpty) {
-          final epId = await _db.into(_db.endpoints).insert(
-                db.EndpointsCompanion.insert(
-                  url: oldEndpoint,
-                  apiKey: Value(oldApiKey),
-                ),
-              );
-          await _db.into(_db.ruleEndpoints).insert(
-                db.RuleEndpointsCompanion.insert(
-                  ruleId: ruleId,
-                  endpointId: epId,
-                  active: const Value(true),
-                  sortOrder: const Value(0),
-                ),
-              );
-        }
       }
     });
 

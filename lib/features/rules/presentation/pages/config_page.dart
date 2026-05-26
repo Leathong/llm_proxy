@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:llm_proxy/core/widgets/scaled_switch.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
 import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.dart';
 import 'package:llm_proxy/features/rules/presentation/widgets/rule_edit_dialog.dart';
-import 'package:llm_proxy/features/rules/presentation/widgets/endpoint_manager_dialog.dart';
+import 'package:llm_proxy/features/rules/presentation/widgets/model_provider_manager_dialog.dart';
 import 'package:llm_proxy/features/rules/presentation/widgets/system_prompt_manager_dialog.dart';
 
 /// 默认分组名（groupName 为空时归入此组）
@@ -82,7 +83,7 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
           return Scaffold(
             appBar: AppBar(
               actions: [
-                _buildEndpointAction(),
+                _buildProviderAction(),
                 _buildSystemPromptAction(),
               ],
             ),
@@ -103,7 +104,7 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
               tabs: _groups.map((g) => Tab(text: g)).toList(),
             ),
             actions: [
-              _buildEndpointAction(),
+              _buildProviderAction(),
               _buildSystemPromptAction(),
             ],
           ),
@@ -125,19 +126,24 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
                         horizontal: 16, vertical: 8),
                     child: ListTile(
                       title: Text(rule.name),
-                      subtitle: Text(
-                        '${rule.customModelId} -> ${rule.targetModelId}\n'
-                        'Endpoints: ${rule.activeEndpoints.length}/${rule.endpoints.length} 活跃',
-                      ),
+                      subtitle: Text(_buildRuleSubtitle(rule)),
                       isThreeLine: true,
-                      trailing: Transform.scale(
-                        scale: 0.75,
-                        child: Switch(
-                          value: rule.active,
-                          onChanged: (val) => ref
-                              .read(rulesProvider.notifier)
-                              .toggle(rule.id, val),
-                        ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline,
+                                size: 20, color: Colors.red),
+                            tooltip: '删除规则',
+                            onPressed: () => _showDeleteDialog(rule),
+                          ),
+                          ScaledSwitch(
+                            value: rule.active,
+                            onChanged: (val) => ref
+                                .read(rulesProvider.notifier)
+                                .toggle(rule.id, val),
+                          ),
+                        ],
                       ),
                       onTap: () => _showRuleDialog(rule: rule),
                       onLongPress: () => _showDeleteDialog(rule),
@@ -153,17 +159,25 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
     );
   }
 
-  Widget _buildEndpointAction() {
+  String _buildRuleSubtitle(Rule rule) {
+    if (rule.providerModelId != null) {
+      return '${rule.customModelId} -> ProviderModel #${rule.providerModelId}';
+    }
+    return '${rule.customModelId} -> ${rule.targetModelId} (未关联 Provider)';
+  }
+
+  Widget _buildProviderAction() {
     return IconButton(
-      icon: const Icon(Icons.dns_outlined),
-      tooltip: '管理 Endpoint',
+      icon: const Icon(Icons.cloud_outlined),
+      tooltip: '管理 Model Provider',
       onPressed: () async {
         await showDialog(
           context: context,
-          builder: (_) => const EndpointManagerDialog(),
+          builder: (_) => const ModelProviderManagerDialog(),
         );
         if (!context.mounted) return;
-        ref.invalidate(allEndpointsProvider);
+        ref.invalidate(modelProvidersProvider);
+        ref.invalidate(allProviderModelsProvider);
       },
     );
   }
