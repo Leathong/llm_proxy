@@ -25,6 +25,8 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
   late String _thinkingMode;
   late String _reasoningEffort;
   late bool _convertThinkingToContent;
+  late bool _stream;
+  late bool _streamIncludeUsage;
   int? _systemPromptId;
   int? _providerModelId;
 
@@ -39,6 +41,8 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
     _thinkingMode = widget.rule?.thinkingMode ?? '';
     _reasoningEffort = widget.rule?.reasoningEffort ?? '';
     _convertThinkingToContent = widget.rule?.convertThinkingToContent ?? false;
+    _stream = widget.rule?.stream ?? true;
+    _streamIncludeUsage = widget.rule?.streamIncludeUsage ?? true;
     _systemPromptId = widget.rule?.systemPromptId;
     _providerModelId = widget.rule?.providerModelId;
   }
@@ -73,6 +77,8 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
       thinkingMode: _thinkingMode,
       reasoningEffort: _reasoningEffort,
       convertThinkingToContent: _convertThinkingToContent,
+      stream: _stream,
+      streamIncludeUsage: _streamIncludeUsage,
       systemPromptId: _systemPromptId,
     );
   }
@@ -152,6 +158,21 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                   value: _convertThinkingToContent,
                   onChanged: (val) =>
                       setState(() => _convertThinkingToContent = val),
+                ),
+                const SizedBox(height: 8),
+                SwitchTile(
+                  title: const Text('启用流式响应 (stream)'),
+                  subtitle: const Text('开启后使用 SSE 流式返回，关闭后为普通 JSON 响应'),
+                  value: _stream,
+                  onChanged: (val) => setState(() => _stream = val),
+                ),
+                const SizedBox(height: 8),
+                SwitchTile(
+                  title: const Text('流式响应包含用量 (stream_options.include_usage)'),
+                  subtitle: const Text('开启后在流式响应的最后一个 chunk 中包含 token 用量信息'),
+                  value: _streamIncludeUsage,
+                  onChanged: (val) =>
+                      setState(() => _streamIncludeUsage = val),
                 ),
                 const SizedBox(height: 8),
                 _buildSystemPromptSelector(),

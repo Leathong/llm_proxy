@@ -62,6 +62,9 @@ class Rules extends Table {
   IntColumn get systemPromptId =>
       integer().nullable().references(SystemPrompts, #id,
           onDelete: KeyAction.setNull)();
+  BoolColumn get stream => boolean().withDefault(const Constant(true))();
+  BoolColumn get streamIncludeUsage =>
+      boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
 }
@@ -156,13 +159,17 @@ class AppDatabase extends _$AppDatabase {
   String get databaseFilePath => _dbFilePath;
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (migrator, from, to) async {
           if (from < 2) {
             await migrator.addColumn(rules, rules.providerModelName);
+          }
+          if (from < 3) {
+            await migrator.addColumn(rules, rules.stream as GeneratedColumn);
+            await migrator.addColumn(rules, rules.streamIncludeUsage as GeneratedColumn);
           }
         },
       );

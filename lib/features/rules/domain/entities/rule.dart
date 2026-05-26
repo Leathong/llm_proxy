@@ -11,6 +11,8 @@ class Rule {
   final String reasoningEffort;
   final bool convertThinkingToContent;
   final int? systemPromptId;
+  final bool stream; // 是否启用流式响应
+  final bool streamIncludeUsage; // 流式响应中是否包含 usage 信息
 
   const Rule({
     required this.id,
@@ -25,6 +27,8 @@ class Rule {
     this.reasoningEffort = '',
     this.convertThinkingToContent = false,
     this.systemPromptId,
+    this.stream = true,
+    this.streamIncludeUsage = true,
   });
 
   Rule copyWith({
@@ -40,6 +44,8 @@ class Rule {
     String? reasoningEffort,
     bool? convertThinkingToContent,
     int? systemPromptId,
+    bool? stream,
+    bool? streamIncludeUsage,
   }) {
     return Rule(
       id: id ?? this.id,
@@ -54,6 +60,8 @@ class Rule {
       reasoningEffort: reasoningEffort ?? this.reasoningEffort,
       convertThinkingToContent: convertThinkingToContent ?? this.convertThinkingToContent,
       systemPromptId: systemPromptId ?? this.systemPromptId,
+      stream: stream ?? this.stream,
+      streamIncludeUsage: streamIncludeUsage ?? this.streamIncludeUsage,
     );
   }
 }

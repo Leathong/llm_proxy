@@ -36,7 +36,11 @@ class RequestTransformer {
         _transformAnthropic(bodyJson, rule, systemPromptContent, onLog);
     }
 
-    bodyJson['stream_options'] = {'include_usage': true};
+    // 根据规则配置决定是否注入 stream 参数
+    bodyJson['stream'] = rule.stream;
+    if (rule.stream && rule.streamIncludeUsage) {
+      bodyJson['stream_options'] = {'include_usage': true};
+    }
     return bodyJson;
   }
 
