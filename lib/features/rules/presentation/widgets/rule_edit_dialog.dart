@@ -151,7 +151,6 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                       setState(() => _reasoningEffort = val ?? ''),
                   onSaved: (val) => _reasoningEffort = val ?? '',
                 ),
-                const SizedBox(height: 8),
                 SwitchTile(
                   title: const Text('将模型思考转写为正常返回'),
                   subtitle: const Text('开启后 thinking/reasoning 将作为 content 返回'),
@@ -159,14 +158,12 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                   onChanged: (val) =>
                       setState(() => _convertThinkingToContent = val),
                 ),
-                const SizedBox(height: 8),
                 SwitchTile(
                   title: const Text('启用流式响应 (stream)'),
                   subtitle: const Text('开启后使用 SSE 流式返回，关闭后为普通 JSON 响应'),
                   value: _stream,
                   onChanged: (val) => setState(() => _stream = val),
                 ),
-                const SizedBox(height: 8),
                 SwitchTile(
                   title: const Text('流式响应包含用量 (stream_options.include_usage)'),
                   subtitle: const Text('开启后在流式响应的最后一个 chunk 中包含 token 用量信息'),
@@ -174,8 +171,8 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                   onChanged: (val) =>
                       setState(() => _streamIncludeUsage = val),
                 ),
-                const SizedBox(height: 8),
                 _buildSystemPromptSelector(),
+                const SizedBox(height: 8),
                 SwitchTile(
                   title: const Text('启用规则'),
                   value: _active,
@@ -281,6 +278,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                   labelText: '关联模型',
                   hintText: '请选择 Provider 模型',
                   suffixIcon: Icon(Icons.arrow_drop_down),
+                  suffixIconConstraints: BoxConstraints(),
                 ),
                 child: Text(
                   selectedText ?? '请选择...',

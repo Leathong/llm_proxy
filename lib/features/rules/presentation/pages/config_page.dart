@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_proxy/core/widgets/scaled_switch.dart';
+import 'package:llm_proxy/features/rules/domain/entities/provider_model.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
 import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.dart';
+import 'package:llm_proxy/features/rules/presentation/widgets/provider_model_dropdown.dart';
 import 'package:llm_proxy/features/rules/presentation/widgets/rule_edit_dialog.dart';
 import 'package:llm_proxy/features/rules/presentation/widgets/model_provider_manager_dialog.dart';
 import 'package:llm_proxy/features/rules/presentation/widgets/system_prompt_manager_dialog.dart';
@@ -136,29 +138,77 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
                   return Card(
                     margin: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 8),
-                    child: ListTile(
-                      title: Text(rule.name),
-                      subtitle: Text(_buildRuleSubtitle(rule)),
-                      isThreeLine: true,
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline,
-                                size: 20, color: Colors.red),
-                            tooltip: '删除规则',
-                            onPressed: () => _showDeleteDialog(rule),
-                          ),
-                          ScaledSwitch(
-                            value: rule.active,
-                            onChanged: (val) => ref
-                                .read(rulesProvider.notifier)
-                                .toggle(rule.id, val),
-                          ),
-                        ],
-                      ),
+                    child: InkWell(
                       onTap: () => _showRuleDialog(rule: rule),
                       onLongPress: () => _showDeleteDialog(rule),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 标题行：规则名称 + 操作按钮
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    rule.name,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      // backgroundColor: Colors.red,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline,
+                                      size: 20, color: Colors.red),
+                                  tooltip: '删除规则',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                      minWidth: 32, minHeight: 32),
+                                  onPressed: () => _showDeleteDialog(rule),
+                                ),
+                                ScaledSwitch(
+                                  value: rule.active,
+                                  onChanged: (val) => ref
+                                      .read(rulesProvider.notifier)
+                                      .toggle(rule.id, val),
+                                ),
+                              ],
+                            ),
+                            // 模型切换下拉框（一级页面直接切换）
+                            ProviderModelDropdown(
+                              providerModelId: rule.providerModelId,
+                              compact: true,
+                              onChanged: (ProviderModel selected) {
+                                // 构建 providerModelName
+                                final providersAsync =
+                                    ref.read(modelProvidersProvider);
+                                final providers =
+                                    providersAsync.asData?.value ?? [];
+                                final pName = providers
+                                    .where(
+                                        (p) => p.id == selected.providerId)
+                                    .firstOrNull
+                                    ?.name ??
+                                    'Provider #${selected.providerId}';
+                                final providerModelName =
+                                    '$pName / ${selected.modelId}';
+
+                                ref.read(rulesProvider.notifier).updateRule(
+                                      rule.copyWith(
+                                        providerModelId: selected.id,
+                                        providerModelName:
+                                            providerModelName,
+                                      ),
+                                    );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   );
                 },
@@ -169,16 +219,6 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
         );
       },
     );
-  }
-
-  String _buildRuleSubtitle(Rule rule) {
-    if (rule.providerModelName.isNotEmpty) {
-      return '${rule.customModelId} -> ${rule.providerModelName}';
-    }
-    if (rule.providerModelId != null) {
-      return '${rule.customModelId} -> ProviderModel #${rule.providerModelId}';
-    }
-    return '${rule.customModelId} -> ${rule.targetModelId} (未关联 Provider)';
   }
 
   Widget _buildReorderAction() {

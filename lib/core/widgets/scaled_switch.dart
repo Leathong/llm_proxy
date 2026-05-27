@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// 缩放为 0.7 的自定义 Switch，解决缩放后样式异常的问题
+/// 缩放为 0.6 的自定义 Switch，解决缩放后样式异常的问题
 class ScaledSwitch extends StatelessWidget {
   final bool value;
   final ValueChanged<bool>? onChanged;
@@ -9,11 +9,15 @@ class ScaledSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Transform.scale(
-      scale: 0.7,
-      child: Switch(
-        value: value,
-        onChanged: onChanged,
+    return SizedBox(
+      width: 48,
+      height: 24,
+      child: Transform.scale(
+        scale: 0.6,
+        child: Switch(
+          value: value,
+          onChanged: onChanged,
+        ),
       ),
     );
   }
@@ -38,8 +42,14 @@ class SwitchTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding: .zero,
+      dense: true,
+      visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
       title: title,
+      minTileHeight: 0,
+      horizontalTitleGap: 0,
+      titleTextStyle: const TextStyle(fontSize: 14, color: Colors.black, fontWeight: .w400),
       subtitle: subtitle,
+      subtitleTextStyle: TextStyle(fontSize: 12, color: Colors.grey[800], fontWeight: FontWeight.w300),
       trailing: ScaledSwitch(value: value, onChanged: onChanged),
       onTap: onChanged != null ? () => onChanged!(!value) : null,
     );
