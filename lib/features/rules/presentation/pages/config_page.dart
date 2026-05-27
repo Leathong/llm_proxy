@@ -84,7 +84,7 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
   Widget build(BuildContext context) {
     final rulesAsync = ref.watch(rulesProvider);
     final savedOrder = ref.watch(groupOrderProvider);
-
+    const double appbarTrailing = 6;
     return rulesAsync.when(
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -99,6 +99,7 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
               actions: [
                 _buildProviderAction(),
                 _buildSystemPromptAction(),
+                const SizedBox(width: appbarTrailing),
               ],
             ),
             body: const Center(child: Text('暂无代理规则，请点击右下角添加')),
@@ -120,6 +121,7 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
               _buildReorderAction(),
               _buildProviderAction(),
               _buildSystemPromptAction(),
+              const SizedBox(width: appbarTrailing),
             ],
           ),
           body: TabBarView(

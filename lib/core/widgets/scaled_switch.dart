@@ -10,7 +10,7 @@ class ScaledSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 48,
+      width: 36,
       height: 24,
       child: Transform.scale(
         scale: 0.6,
