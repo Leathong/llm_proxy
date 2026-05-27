@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_proxy/core/widgets/scaled_switch.dart';
@@ -27,8 +29,11 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
   late bool _convertThinkingToContent;
   late bool _stream;
   late bool _streamIncludeUsage;
+  late String _customParams;
   int? _systemPromptId;
   int? _providerModelId;
+
+  late final TextEditingController _customParamsController;
 
   @override
   void initState() {
@@ -43,8 +48,16 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
     _convertThinkingToContent = widget.rule?.convertThinkingToContent ?? false;
     _stream = widget.rule?.stream ?? true;
     _streamIncludeUsage = widget.rule?.streamIncludeUsage ?? true;
+    _customParams = widget.rule?.customParams ?? '';
     _systemPromptId = widget.rule?.systemPromptId;
     _providerModelId = widget.rule?.providerModelId;
+    _customParamsController = TextEditingController(text: _customParams);
+  }
+
+  @override
+  void dispose() {
+    _customParamsController.dispose();
+    super.dispose();
   }
 
   Rule _buildRule({int? overrideId}) {
@@ -80,6 +93,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
       stream: _stream,
       streamIncludeUsage: _streamIncludeUsage,
       systemPromptId: _systemPromptId,
+      customParams: _customParams,
     );
   }
 
@@ -172,6 +186,31 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                       setState(() => _streamIncludeUsage = val),
                 ),
                 _buildSystemPromptSelector(),
+                const SizedBox(height: 8),
+                // 自定义参数 JSON 输入
+                TextFormField(
+                  controller: _customParamsController,
+                  decoration: const InputDecoration(
+                    labelText: '自定义参数 (JSON)',
+                    hintText: '可选，输入合法的 JSON 对象，如 {"temperature": 0.7}',
+                    alignLabelWithHint: true,
+                  ),
+                  maxLines: 4,
+                  minLines: 2,
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return null;
+                    try {
+                      final decoded = jsonDecode(val.trim());
+                      if (decoded is! Map<String, dynamic>) {
+                        return '自定义参数必须是 JSON 对象格式';
+                      }
+                    } catch (e) {
+                      return 'JSON 格式不合法: ${e.toString().replaceFirst("FormatException: ", "")}';
+                    }
+                    return null;
+                  },
+                  onSaved: (val) => _customParams = val?.trim() ?? '',
+                ),
                 const SizedBox(height: 8),
                 SwitchTile(
                   title: const Text('启用规则'),

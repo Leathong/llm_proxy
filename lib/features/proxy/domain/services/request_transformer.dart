@@ -36,6 +36,9 @@ class RequestTransformer {
         _transformAnthropic(bodyJson, rule, systemPromptContent, onLog);
     }
 
+    // 合并自定义参数到请求体中（自定义参数优先级最高，覆盖已存在参数）
+    _mergeCustomParams(bodyJson, rule, onLog);
+
     // 根据规则配置决定是否注入 stream 参数
     bodyJson['stream'] = rule.stream;
     if (rule.stream && rule.streamIncludeUsage) {
@@ -121,4 +124,18 @@ void _injectThinking(
     bodyJson['reasoning_effort'] = rule.reasoningEffort;
     onLog?.call('注入 reasoning_effort: ${rule.reasoningEffort}');
   }
+}
+
+/// 将规则中配置的自定义参数合并到请求体中
+void _mergeCustomParams(
+  Map<String, dynamic> bodyJson,
+  Rule rule,
+  void Function(String message)? onLog,
+) {
+  final customParams = rule.parsedCustomParams;
+  if (customParams.isEmpty) return;
+
+  // 自定义参数优先级最高，直接覆盖已存在的 key
+  bodyJson.addAll(customParams);
+  onLog?.call('已合并自定义参数: ${customParams.keys.join(", ")}');
 }

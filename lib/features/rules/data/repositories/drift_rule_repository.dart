@@ -49,6 +49,7 @@ class DriftRuleRepository implements RuleRepository {
         systemPromptId: rule.systemPromptId,
         stream: rule.stream,
         streamIncludeUsage: rule.streamIncludeUsage,
+        customParams: rule.customParams,
       );
     }).toList();
 
@@ -72,6 +73,7 @@ class DriftRuleRepository implements RuleRepository {
           systemPromptId: Value(rule.systemPromptId),
           stream: Value(rule.stream),
           streamIncludeUsage: Value(rule.streamIncludeUsage),
+          customParams: Value(rule.customParams),
         ));
 
     return entity.Rule(
@@ -89,6 +91,7 @@ class DriftRuleRepository implements RuleRepository {
       systemPromptId: rule.systemPromptId,
       stream: rule.stream,
       streamIncludeUsage: rule.streamIncludeUsage,
+      customParams: rule.customParams,
     );
   }
 
@@ -110,6 +113,7 @@ class DriftRuleRepository implements RuleRepository {
         systemPromptId: Value(rule.systemPromptId),
         stream: Value(rule.stream),
         streamIncludeUsage: Value(rule.streamIncludeUsage),
+        customParams: Value(rule.customParams),
       ),
     );
   }

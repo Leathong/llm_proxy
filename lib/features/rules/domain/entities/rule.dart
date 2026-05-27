@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Rule {
   final int id;
   final String name;
@@ -13,8 +15,13 @@ class Rule {
   final int? systemPromptId;
   final bool stream; // 是否启用流式响应
   final bool streamIncludeUsage; // 流式响应中是否包含 usage 信息
+  final String customParams; // 自定义参数 JSON 字符串，请求时合并到请求体中
 
-  const Rule({
+  /// 自定义参数解析缓存，避免每次请求都 decode
+  Map<String, dynamic>? _cachedCustomParams;
+  bool _customParamsParsed = false;
+
+  Rule({
     required this.id,
     required this.name,
     this.groupName = '',
@@ -29,7 +36,24 @@ class Rule {
     this.systemPromptId,
     this.stream = true,
     this.streamIncludeUsage = true,
+    this.customParams = '',
   });
+
+  /// 获取解析后的自定义参数，带缓存
+  Map<String, dynamic> get parsedCustomParams {
+    if (_customParamsParsed) return _cachedCustomParams ?? {};
+    _customParamsParsed = true;
+    if (customParams.isEmpty) {
+      _cachedCustomParams = {};
+      return {};
+    }
+    try {
+      _cachedCustomParams = jsonDecode(customParams) as Map<String, dynamic>;
+    } catch (_) {
+      _cachedCustomParams = {};
+    }
+    return _cachedCustomParams!;
+  }
 
   Rule copyWith({
     int? id,
@@ -46,6 +70,7 @@ class Rule {
     int? systemPromptId,
     bool? stream,
     bool? streamIncludeUsage,
+    String? customParams,
   }) {
     return Rule(
       id: id ?? this.id,
@@ -62,6 +87,7 @@ class Rule {
       systemPromptId: systemPromptId ?? this.systemPromptId,
       stream: stream ?? this.stream,
       streamIncludeUsage: streamIncludeUsage ?? this.streamIncludeUsage,
+      customParams: customParams ?? this.customParams,
     );
   }
 }

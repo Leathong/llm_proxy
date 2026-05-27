@@ -65,6 +65,7 @@ class Rules extends Table {
   BoolColumn get stream => boolean().withDefault(const Constant(true))();
   BoolColumn get streamIncludeUsage =>
       boolean().withDefault(const Constant(true))();
+  TextColumn get customParams => text().withDefault(const Constant(''))();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
 }
@@ -159,7 +160,7 @@ class AppDatabase extends _$AppDatabase {
   String get databaseFilePath => _dbFilePath;
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -170,6 +171,9 @@ class AppDatabase extends _$AppDatabase {
           if (from < 3) {
             await migrator.addColumn(rules, rules.stream as GeneratedColumn);
             await migrator.addColumn(rules, rules.streamIncludeUsage as GeneratedColumn);
+          }
+          if (from < 4) {
+            await migrator.addColumn(rules, rules.customParams as GeneratedColumn);
           }
         },
       );
