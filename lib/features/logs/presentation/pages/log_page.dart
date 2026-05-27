@@ -193,6 +193,8 @@ class _LogPageState extends ConsumerState<LogPage> {
                       subtractFirstByte: state.subtractFirstByte,
                       isExpanded: item.isExpanded,
                       onToggleExpanded: () => _notifier.toggleExpanded(item.entry.id),
+                      entryId: item.entry.id,
+                      onExportSingle: (entryId) => _exportSingleLog(entryId),
                     );
                   },
                 )
@@ -359,6 +361,26 @@ class _LogPageState extends ConsumerState<LogPage> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('已导出 ${state.filteredEntries.length} 条日志到 $result')),
+      );
+    }
+  }
+
+  /// 导出单条日志的原始内容
+  Future<void> _exportSingleLog(int entryId) async {
+    final result = await FilePicker.saveFile(
+      dialogTitle: '导出单条日志',
+      fileName: 'log_${entryId}_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.log',
+      type: FileType.custom,
+      allowedExtensions: ['log'],
+    );
+    if (result == null) return;
+
+    final notifier = ref.read(logProvider.notifier);
+    await notifier.exportSingleLog(entryId, result);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已导出日志 #$entryId 到 $result')),
       );
     }
   }

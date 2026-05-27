@@ -471,6 +471,16 @@ class LogNotifier extends Notifier<LogState> {
     );
   }
 
+  /// 导出单条日志的原始内容（从数据库读取 requestBody/responseBody）
+  Future<void> exportSingleLog(int entryId, String filePath) async {
+    final entry = await _repo.getLog(entryId);
+    if (entry == null) return;
+    await LogFileExporter.exportToFile(
+      filePath: filePath,
+      entries: [entry],
+    );
+  }
+
   Future<int> importLogs(String filePath) async {
     final parsedEntries = await LogFileParser.parseFile(filePath);
     if (parsedEntries.isEmpty) return 0;
