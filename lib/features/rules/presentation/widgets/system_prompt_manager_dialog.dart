@@ -79,22 +79,24 @@ class _SystemPromptManagerDialogState
   }
 
   void _showEditDialog(BuildContext context, {SystemPrompt? prompt}) {
-    showDialog(
-      context: context,
-      builder: (ctx) => _SystemPromptEditDialog(
-        prompt: prompt,
-        onSave: (name, content) async {
-          if (prompt == null) {
-            await ref.read(systemPromptsProvider.notifier).add(
-                  SystemPrompt(id: 0, name: name, content: content),
-                );
-          } else {
-            await ref.read(systemPromptsProvider.notifier).updatePrompt(
-                  SystemPrompt(
-                      id: prompt.id, name: name, content: content),
-                );
-          }
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => _SystemPromptEditPage(
+          prompt: prompt,
+          onSave: (name, content) async {
+            if (prompt == null) {
+              await ref.read(systemPromptsProvider.notifier).add(
+                    SystemPrompt(id: 0, name: name, content: content),
+                  );
+            } else {
+              await ref.read(systemPromptsProvider.notifier).updatePrompt(
+                    SystemPrompt(
+                        id: prompt.id, name: name, content: content),
+                  );
+            }
+          },
+        ),
       ),
     );
   }
@@ -122,24 +124,25 @@ class _SystemPromptManagerDialogState
   }
 }
 
-class _SystemPromptEditDialog extends StatefulWidget {
+class _SystemPromptEditPage extends StatefulWidget {
   final SystemPrompt? prompt;
   final Future<void> Function(String name, String content) onSave;
 
-  const _SystemPromptEditDialog({
+  const _SystemPromptEditPage({
     required this.onSave,
     this.prompt,
   });
 
   @override
-  State<_SystemPromptEditDialog> createState() =>
-      _SystemPromptEditDialogState();
+  State<_SystemPromptEditPage> createState() =>
+      _SystemPromptEditPageState();
 }
 
-class _SystemPromptEditDialogState extends State<_SystemPromptEditDialog> {
+class _SystemPromptEditPageState extends State<_SystemPromptEditPage> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _contentController;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -157,20 +160,59 @@ class _SystemPromptEditDialogState extends State<_SystemPromptEditDialog> {
     super.dispose();
   }
 
+  Future<void> _handleSave() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isSaving = true);
+      try {
+        await widget.onSave(
+          _nameController.text,
+          _contentController.text,
+        );
+        if (!mounted) return;
+        Navigator.pop(context);
+      } finally {
+        if (mounted) {
+          setState(() => _isSaving = false);
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.prompt == null ? '新增 System Prompt' : '编辑 System Prompt'),
-      content: SizedBox(
-        width: 450,
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.prompt == null ? '新增 System Prompt' : '编辑 System Prompt'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _isSaving ? null : _handleSave,
+            child: _isSaving
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('保存'),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: '名称'),
+                decoration: const InputDecoration(
+                  labelText: '名称',
+                  border: OutlineInputBorder(),
+                ),
                 validator: (val) =>
                     val == null || val.isEmpty ? '请输入名称' : null,
               ),
@@ -180,8 +222,11 @@ class _SystemPromptEditDialogState extends State<_SystemPromptEditDialog> {
                 decoration: const InputDecoration(
                   labelText: '内容',
                   alignLabelWithHint: true,
+                  border: OutlineInputBorder(),
                 ),
-                maxLines: 8,
+                maxLines: null,
+                minLines: 15,
+                expands: false,
                 validator: (val) =>
                     val == null || val.isEmpty ? '请输入内容' : null,
               ),
@@ -189,25 +234,6 @@ class _SystemPromptEditDialogState extends State<_SystemPromptEditDialog> {
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-        TextButton(
-          onPressed: () async {
-            if (_formKey.currentState!.validate()) {
-              await widget.onSave(
-                _nameController.text,
-                _contentController.text,
-              );
-              if (!context.mounted) return;
-              Navigator.pop(context);
-            }
-          },
-          child: const Text('保存'),
-        ),
-      ],
     );
   }
 }
