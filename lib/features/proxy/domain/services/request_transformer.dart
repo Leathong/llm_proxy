@@ -39,10 +39,12 @@ class RequestTransformer {
     // 合并自定义参数到请求体中（自定义参数优先级最高，覆盖已存在参数）
     _mergeCustomParams(bodyJson, rule, onLog);
 
-    // 根据规则配置决定是否注入 stream 参数
-    bodyJson['stream'] = rule.stream;
-    if (rule.stream && rule.streamIncludeUsage) {
-      bodyJson['stream_options'] = {'include_usage': true};
+    // 根据规则配置决定是否注入 stream 参数（null 表示不覆盖请求体中的原始值）
+    if (rule.stream != null) {
+      bodyJson['stream'] = rule.stream;
+      if (rule.stream! && rule.streamIncludeUsage) {
+        bodyJson['stream_options'] = {'include_usage': true};
+      }
     }
     return bodyJson;
   }

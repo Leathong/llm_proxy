@@ -62,7 +62,7 @@ class Rules extends Table {
   IntColumn get systemPromptId =>
       integer().nullable().references(SystemPrompts, #id,
           onDelete: KeyAction.setNull)();
-  BoolColumn get stream => boolean().withDefault(const Constant(true))();
+  BoolColumn get stream => boolean().nullable()();
   BoolColumn get streamIncludeUsage =>
       boolean().withDefault(const Constant(true))();
   TextColumn get customParams => text().withDefault(const Constant(''))();
@@ -160,7 +160,7 @@ class AppDatabase extends _$AppDatabase {
   String get databaseFilePath => _dbFilePath;
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -174,6 +174,13 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 4) {
             await migrator.addColumn(rules, rules.customParams as GeneratedColumn);
+          }
+          // stream 列从 NOT NULL DEFAULT true 改为 nullable，已有数据保留原值
+          if (from < 5) {
+            await customStatement('ALTER TABLE "rules" RENAME COLUMN "stream" TO "stream_old"');
+            await migrator.addColumn(rules, rules.stream as GeneratedColumn);
+            await customStatement('UPDATE "rules" SET "stream" = "stream_old"');
+            await customStatement('ALTER TABLE "rules" DROP COLUMN "stream_old"');
           }
         },
       );

@@ -27,7 +27,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
   late String _thinkingMode;
   late String _reasoningEffort;
   late bool _convertThinkingToContent;
-  late bool _stream;
+  late bool? _stream;
   late bool _streamIncludeUsage;
   late String _customParams;
   int? _systemPromptId;
@@ -46,7 +46,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
     _thinkingMode = widget.rule?.thinkingMode ?? '';
     _reasoningEffort = widget.rule?.reasoningEffort ?? '';
     _convertThinkingToContent = widget.rule?.convertThinkingToContent ?? false;
-    _stream = widget.rule?.stream ?? true;
+    _stream = widget.rule?.stream;
     _streamIncludeUsage = widget.rule?.streamIncludeUsage ?? true;
     _customParams = widget.rule?.customParams ?? '';
     _systemPromptId = widget.rule?.systemPromptId;
@@ -172,11 +172,19 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                   onChanged: (val) =>
                       setState(() => _convertThinkingToContent = val),
                 ),
-                SwitchTile(
-                  title: const Text('启用流式响应 (stream)'),
-                  subtitle: const Text('开启后使用 SSE 流式返回，关闭后为普通 JSON 响应'),
-                  value: _stream,
+                DropdownButtonFormField<bool?>(
+                  initialValue: _stream,
+                  decoration: const InputDecoration(
+                    labelText: '流式响应 (stream)',
+                    hintText: '留空表示不覆盖请求体中的原始值',
+                  ),
+                  items: const [
+                    DropdownMenuItem<bool?>(value: null, child: Text('留空（不覆盖）')),
+                    DropdownMenuItem<bool?>(value: true, child: Text('启用')),
+                    DropdownMenuItem<bool?>(value: false, child: Text('禁用')),
+                  ],
                   onChanged: (val) => setState(() => _stream = val),
+                  onSaved: (val) => _stream = val,
                 ),
                 SwitchTile(
                   title: const Text('流式响应包含用量 (stream_options.include_usage)'),

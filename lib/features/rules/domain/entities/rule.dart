@@ -13,7 +13,7 @@ class Rule {
   final String reasoningEffort;
   final bool convertThinkingToContent;
   final int? systemPromptId;
-  final bool stream; // 是否启用流式响应
+  final bool? stream; // 是否启用流式响应，null 表示不覆盖请求体中的 stream
   final bool streamIncludeUsage; // 流式响应中是否包含 usage 信息
   final String customParams; // 自定义参数 JSON 字符串，请求时合并到请求体中
 
@@ -34,7 +34,7 @@ class Rule {
     this.reasoningEffort = '',
     this.convertThinkingToContent = false,
     this.systemPromptId,
-    this.stream = true,
+    this.stream,
     this.streamIncludeUsage = true,
     this.customParams = '',
   });
