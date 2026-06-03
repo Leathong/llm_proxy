@@ -28,6 +28,9 @@ class _ModelProviderManagerPageState
   /// 编辑表单的 key，用于在切换编辑/查看模式时重建表单
   Key _editFormKey = UniqueKey();
 
+  /// 正在获取模型列表的 provider id，null 表示空闲
+  int? _fetchingProviderId;
+
   @override
   void dispose() {
     _modelListService.dispose();
@@ -86,6 +89,7 @@ class _ModelProviderManagerPageState
   }
 
   Future<void> _fetchModels(ModelProvider provider) async {
+    setState(() => _fetchingProviderId = provider.id);
     try {
       final remoteModels = await _modelListService.fetchModels(provider);
       if (!mounted) return;
@@ -96,6 +100,11 @@ class _ModelProviderManagerPageState
 
       final newModels =
           remoteModels.where((m) => !existingIds.contains(m.id)).toList();
+
+      // 接口请求完成，立即停止 loading（弹窗显示前）
+      if (mounted) {
+        setState(() => _fetchingProviderId = null);
+      }
 
       if (!mounted) return;
 
@@ -131,6 +140,10 @@ class _ModelProviderManagerPageState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('获取模型列表失败: $e')),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _fetchingProviderId = null);
       }
     }
   }
@@ -264,11 +277,24 @@ class _ModelProviderManagerPageState
                     ),
                   ),
                   if (!isNew) ...[
-                    IconButton(
-                      icon: const Icon(Icons.download, size: 20),
-                      tooltip: '获取模型列表',
-                      onPressed: () => _fetchModels(provider),
-                    ),
+                    if (_fetchingProviderId == provider.id)
+                      const SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      )
+                    else
+                      IconButton(
+                        icon: const Icon(Icons.download, size: 20),
+                        tooltip: '获取模型列表',
+                        onPressed: () => _fetchModels(provider),
+                      ),
                     IconButton(
                       icon: const Icon(Icons.delete, size: 20, color: Colors.red),
                       tooltip: '删除 Provider',
