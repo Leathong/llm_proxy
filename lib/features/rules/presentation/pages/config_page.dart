@@ -180,33 +180,44 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
                                 ),
                               ],
                             ),
-                            // 模型切换下拉框（一级页面直接切换）
-                            ProviderModelDropdown(
-                              providerModelId: rule.providerModelId,
-                              compact: true,
-                              onChanged: (ProviderModel selected) {
-                                // 构建 providerModelName
-                                final providersAsync =
-                                    ref.read(modelProvidersProvider);
-                                final providers =
-                                    providersAsync.asData?.value ?? [];
-                                final pName = providers
-                                    .where(
-                                        (p) => p.id == selected.providerId)
-                                    .firstOrNull
-                                    ?.name ??
-                                    'Provider #${selected.providerId}';
-                                final providerModelName =
-                                    '$pName / ${selected.modelId}';
+                            // 模型 & 思考深度横排下拉框（一级页面直接切换）
+                            Row(
+                              children: [
+                                _buildReasoningEffortDropdown(rule),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: ProviderModelDropdown(
+                                    providerModelId: rule.providerModelId,
+                                    compact: true,
+                                    onChanged: (ProviderModel selected) {
+                                      // 构建 providerModelName
+                                      final providersAsync =
+                                          ref.read(modelProvidersProvider);
+                                      final providers =
+                                          providersAsync.asData?.value ?? [];
+                                      final pName = providers
+                                          .where((p) =>
+                                              p.id == selected.providerId)
+                                          .firstOrNull
+                                          ?.name ??
+                                          'Provider #${selected.providerId}';
+                                      final providerModelName =
+                                          '$pName / ${selected.modelId}';
 
-                                ref.read(rulesProvider.notifier).updateRule(
-                                      rule.copyWith(
-                                        providerModelId: selected.id,
-                                        providerModelName:
-                                            providerModelName,
-                                      ),
-                                    );
-                              },
+                                      ref
+                                          .read(rulesProvider.notifier)
+                                          .updateRule(
+                                            rule.copyWith(
+                                              providerModelId: selected.id,
+                                              providerModelName:
+                                                  providerModelName,
+                                            ),
+                                          );
+                                    },
+                                  ),
+                                ),
+                                
+                              ],
                             ),
                           ],
                         ),
@@ -269,6 +280,53 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
       onPressed: () => _showRuleDialog(),
       child: const Icon(Icons.add),
     );
+  }
+
+  /// 思考深度（reasoningEffort）紧凑下拉选择器
+  Widget _buildReasoningEffortDropdown(Rule rule) {
+    return PopupMenuButton<String>(
+      offset: const Offset(0, 24),
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(maxWidth: 200),
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: '', child: Text('不注入')),
+        PopupMenuItem(value: 'high', child: Text('high')),
+        PopupMenuItem(value: 'max', child: Text('max')),
+      ],
+      onSelected: (val) {
+        ref
+            .read(rulesProvider.notifier)
+            .updateRule(rule.copyWith(reasoningEffort: val));
+      },
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _reasoningEffortLabel(rule.reasoningEffort),
+              style: TextStyle(
+                fontSize: 12,
+                color:
+                    rule.reasoningEffort.isNotEmpty ? null : Colors.grey[600],
+              ),
+            ),
+            Icon(Icons.arrow_drop_down, size: 18, color: Colors.grey[600]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _reasoningEffortLabel(String effort) {
+    switch (effort) {
+      case 'high':
+        return 'high';
+      case 'max':
+        return 'max';
+      default:
+        return '不注入';
+    }
   }
 
   void _showRuleDialog({Rule? rule}) {
