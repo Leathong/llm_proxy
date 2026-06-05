@@ -179,6 +179,7 @@ class ProviderModelDropdown extends ConsumerWidget {
         final isSelected = m.id == providerModelId;
         items.add(
           PopupMenuItem<String>(
+            height: 32,
             value: m.id.toString(),
             child: Row(
               children: [

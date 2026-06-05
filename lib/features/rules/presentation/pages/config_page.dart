@@ -291,10 +291,10 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(maxWidth: 200),
       itemBuilder: (_) => const [
-        PopupMenuItem(value: ReasoningLevel.none, child: Text('none')),
-        PopupMenuItem(value: ReasoningLevel.off, child: Text('off')),
-        PopupMenuItem(value: ReasoningLevel.high, child: Text('high')),
-        PopupMenuItem(value: ReasoningLevel.max, child: Text('max')),
+        PopupMenuItem(height: 32, value: ReasoningLevel.none, child: Text('none')),
+        PopupMenuItem(height: 32, value: ReasoningLevel.off, child: Text('off')),
+        PopupMenuItem(height: 32, value: ReasoningLevel.high, child: Text('high')),
+        PopupMenuItem(height: 32, value: ReasoningLevel.max, child: Text('max')),
       ],
       onSelected: (val) {
         ref.read(rulesProvider.notifier).updateRule(
