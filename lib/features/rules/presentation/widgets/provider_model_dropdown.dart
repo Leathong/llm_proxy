@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/features/rules/domain/entities/provider_model.dart';
 import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.dart';
 
@@ -35,7 +36,7 @@ class ProviderModelDropdown extends ConsumerWidget {
       ),
       error: (e, _) => Text(
         '加载失败',
-        style: TextStyle(color: Colors.red, fontSize: compact ? 11 : 12),
+        style: TextStyle(color: AppColors.error, fontSize: compact ? 11 : 12),
       ),
       data: (providerModels) {
         final enabledModels = providerModels.where((m) => m.enabled).toList();
@@ -101,13 +102,13 @@ class ProviderModelDropdown extends ConsumerWidget {
                       selectedText ?? '未关联',
                       style: TextStyle(
                         fontSize: 12,
-                        color: selectedText != null ? null : Colors.grey[600],
+                        color: selectedText != null ? null : AppColors.grey,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Icon(Icons.arrow_drop_down, size: 18,
-                      color: Colors.grey[600]),
+                      color: AppColors.grey),
                 ],
               ),
             ),
@@ -167,7 +168,7 @@ class ProviderModelDropdown extends ConsumerWidget {
               ),
               Text(
                 '${models.length} 个模型',
-                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                style: TextStyle(fontSize: 11, color: AppColors.grey),
               ),
             ],
           ),

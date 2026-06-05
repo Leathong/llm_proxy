@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/message_widgets.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/response_content.dart';
@@ -48,10 +49,10 @@ class LogDetail extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.purple.withValues(alpha: 0.04),
+                      color: AppColors.purple.withValues(alpha: 0.04),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                          color: Colors.purple.withValues(alpha: 0.15)),
+                          color: AppColors.purple.withValues(alpha: 0.15)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -66,7 +67,7 @@ class LogDetail extends StatelessWidget {
                         Text('点击查看完整内容',
                             style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.purple.withValues(alpha: 0.6))),
+                                color: AppColors.purple.withValues(alpha: 0.6))),
                       ],
                     ),
                   ),
@@ -88,11 +89,11 @@ class LogDetail extends StatelessWidget {
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       visualDensity: VisualDensity.compact,
                       avatar:
-                          const Icon(Icons.build, size: 14, color: Colors.amber),
+                          const Icon(Icons.build, size: 14, color: AppColors.toolCall),
                       label: Text(t.name, style: const TextStyle(fontSize: 11)),
-                      backgroundColor: Colors.amber.withValues(alpha: 0.08),
+                      backgroundColor: AppColors.toolCall.withValues(alpha: 0.08),
                       side: BorderSide(
-                          color: Colors.amber.withValues(alpha: 0.3)),
+                          color: AppColors.toolCall.withValues(alpha: 0.3)),
                       onPressed: () => _showToolDetail(context, t),
                     );
                   }).toList(),
@@ -142,12 +143,12 @@ class LogDetail extends StatelessWidget {
                   decoration: BoxDecoration(
                     border: Border(
                       bottom:
-                          BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+                          BorderSide(color: AppColors.grey.withValues(alpha: 0.2)),
                     ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.settings, size: 18, color: Colors.purple),
+                      const Icon(Icons.settings, size: 18, color: AppColors.purple),
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text('System Prompt',
@@ -193,12 +194,12 @@ class LogDetail extends StatelessWidget {
                   decoration: BoxDecoration(
                     border: Border(
                       bottom:
-                          BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+                          BorderSide(color: AppColors.grey.withValues(alpha: 0.2)),
                     ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.build, size: 18, color: Colors.amber),
+                      const Icon(Icons.build, size: 18, color: AppColors.toolCall),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(tool.name,
@@ -299,13 +300,13 @@ class UsageInfo extends StatelessWidget {
       runSpacing: 4,
       children: [
         if (usage.inputTokens != null)
-          _tokenChip('输入', usage.inputTokens!, Colors.blue),
+          _tokenChip('输入', usage.inputTokens!, AppColors.tokenInput),
         if (usage.cacheCreationInputTokens != null)
-          _tokenChip('缓存创建', usage.cacheCreationInputTokens!, Colors.teal),
+          _tokenChip('缓存创建', usage.cacheCreationInputTokens!, AppColors.tokenCacheCreation),
         if (usage.cacheReadInputTokens != null)
-          _tokenChip('缓存读取', usage.cacheReadInputTokens!, Colors.cyan),
+          _tokenChip('缓存读取', usage.cacheReadInputTokens!, AppColors.tokenCacheRead),
         if (usage.outputTokens != null)
-          _tokenChip('输出', usage.outputTokens!, Colors.orange),
+          _tokenChip('输出', usage.outputTokens!, AppColors.tokenOutput),
       ],
     );
   }

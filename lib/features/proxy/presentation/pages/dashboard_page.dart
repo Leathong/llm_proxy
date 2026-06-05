@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/features/proxy/domain/entities/active_request_info.dart';
 import 'package:llm_proxy/features/proxy/presentation/providers/active_requests_providers.dart';
 import 'package:llm_proxy/features/proxy/presentation/providers/proxy_providers.dart';
@@ -54,7 +55,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: const Text('断开'),
           ),
         ],
@@ -91,7 +92,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             Icon(
               proxyState.isRunning ? Icons.cloud_done : Icons.cloud_off,
               size: 64,
-              color: proxyState.isRunning ? Colors.green : Colors.grey,
+              color: proxyState.isRunning ? AppColors.success : AppColors.grey,
             ),
             const SizedBox(height: 12),
             Text(
@@ -100,11 +101,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             ),
             const SizedBox(height: 8),
             Text('当前代理端口: ${settings.proxyPort}',
-                style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                style: const TextStyle(fontSize: 14, color: AppColors.grey)),
             if (proxyState.error != null) ...[
               const SizedBox(height: 8),
               Text(proxyState.error!,
-                  style: const TextStyle(color: Colors.red, fontSize: 13)),
+                  style: const TextStyle(color: AppColors.error, fontSize: 13)),
             ],
             const SizedBox(height: 20),
             ElevatedButton.icon(
@@ -151,14 +152,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: requests.isNotEmpty ? Colors.orange : Colors.grey.shade200,
+                    color: requests.isNotEmpty ? AppColors.warning : AppColors.greyUltraLight,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     '${requests.length}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: requests.isNotEmpty ? Colors.white : Colors.grey,
+                      color: requests.isNotEmpty ? AppColors.whiteSoft : AppColors.grey,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -174,10 +175,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 child: Column(
                   children: [
                     Icon(Icons.check_circle_outline,
-                        size: 40, color: Colors.grey),
+                        size: 40, color: AppColors.grey),
                     SizedBox(height: 8),
                     Text('没有进行中的请求',
-                        style: TextStyle(color: Colors.grey)),
+                        style: TextStyle(color: AppColors.grey)),
                   ],
                 ),
               ),
@@ -216,7 +217,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             style: const TextStyle(
               fontSize: 13,
               fontFamily: 'monospace',
-              color: Colors.grey,
+              color: AppColors.grey,
             ),
           ),
           const SizedBox(width: 8),
@@ -225,7 +226,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             height: 32,
             child: IconButton(
               padding: EdgeInsets.zero,
-              icon: const Icon(Icons.close, size: 18, color: Colors.red),
+              icon: const Icon(Icons.close, size: 18, color: AppColors.error),
               tooltip: '断开请求',
               onPressed: () async {
                 final confirmed = await _confirmDisconnect(context, info);

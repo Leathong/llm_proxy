@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_stats.dart';
 
 /// 顶部统计摘要栏
@@ -68,29 +69,29 @@ class LogSummaryBar extends StatelessWidget {
                     value: rangeStart != null && rangeEnd != null
                         ? '${rangeStart! + 1}-$rangeEnd / $totalRequests'
                         : '全部 / $totalRequests',
-                    color: Colors.blueGrey,
+                    color: AppColors.statRange,
                     onTap: onRangeTap,
                   ),
                   const SizedBox(width: 8),
-                  _StatChip(label: '总计', value: '$totalCount', color: Colors.grey),
+                  _StatChip(label: '总计', value: '$totalCount', color: AppColors.statTotal),
                   const SizedBox(width: 8),
-                  _StatChip(label: '请求', value: '$totalRequests', color: Colors.blue),
+                  _StatChip(label: '请求', value: '$totalRequests', color: AppColors.statRequests),
                   const SizedBox(width: 8),
-                  _StatChip(label: '成功', value: '$successCount', color: Colors.green),
+                  _StatChip(label: '成功', value: '$successCount', color: AppColors.statSuccess),
                   const SizedBox(width: 8),
-                  _StatChip(label: '失败', value: '$errorCount', color: Colors.red),
+                  _StatChip(label: '失败', value: '$errorCount', color: AppColors.statError),
                   const SizedBox(width: 8),
                   _StatChip(
                     label: 'P90',
                     value: '${p90}ms',
-                    color: Colors.orange,
+                    color: AppColors.statP90,
                     onTap: displayStats.durations.isNotEmpty
                         ? () => _showMetricStats(
                               context,
                               sorted: displayStats.durations,
                               title: '总耗时统计',
                               icon: Icons.timer_outlined,
-                              iconColor: Colors.orange,
+                              iconColor: AppColors.statP90,
                               unit: 'ms',
                             )
                         : null,
@@ -99,20 +100,20 @@ class LogSummaryBar extends StatelessWidget {
                   _StatChip(
                     label: '总耗时',
                     value: displayStats.formatDuration(totalDurationMs),
-                    color: Colors.indigo,
+                    color: AppColors.statTotalDuration,
                   ),
                   const SizedBox(width: 8),
                   if (displayStats.ttfbDurations.isNotEmpty) ...[
                     _StatChip(
                       label: 'TTFB',
                       value: '${ttfbP90}ms',
-                      color: Colors.teal,
+                      color: AppColors.statTTFB,
                       onTap: () => _showMetricStats(
                         context,
                         sorted: displayStats.ttfbDurations,
                         title: '首字节耗时 (TTFB)',
                         icon: Icons.timer_outlined,
-                        iconColor: Colors.teal,
+                        iconColor: AppColors.statTTFB,
                         unit: 'ms',
                       ),
                     ),
@@ -122,13 +123,13 @@ class LogSummaryBar extends StatelessWidget {
                     _StatChip(
                       label: '速度',
                       value: '${avgSpeed.toStringAsFixed(1)} tok/s',
-                      color: Colors.cyan,
+                      color: AppColors.statSpeed,
                       onTap: () => _showMetricStats(
                         context,
                         sorted: displayStats.outputSpeeds,
                         title: '输出 Token 速度',
                         icon: Icons.speed,
-                        iconColor: Colors.cyan,
+                        iconColor: AppColors.statSpeed,
                         unit: 'tok/s',
                         descending: true,
                         avgOverride: avgSpeed,
@@ -139,7 +140,7 @@ class LogSummaryBar extends StatelessWidget {
                   _StatChip(
                     label: 'Tokens',
                     value: '${displayStats.formatNumber(totalInput)} / ${displayStats.formatNumber(totalOutput)}',
-                    color: Colors.purple,
+                    color: AppColors.statTokens,
                     onTap: entryWithUsage > 0
                         ? () => _showTokenStats(
                               context,
@@ -243,13 +244,13 @@ class LogSummaryBar extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              _MetricRow(label: maxLabel ?? '最慢', value: fmt(max), ratio: 1.0, barColor: Colors.red),
-              _MetricRow(label: 'P90', value: fmt(p90), ratio: ratio(p90), barColor: Colors.orange),
-              _MetricRow(label: 'P70', value: fmt(p70), ratio: ratio(p70), barColor: Colors.amber),
-              _MetricRow(label: 'P50', value: fmt(p50), ratio: ratio(p50), barColor: Colors.teal),
-              _MetricRow(label: '平均', value: fmt(avg), ratio: ratio(avg), barColor: Colors.blue),
+              _MetricRow(label: maxLabel ?? '最慢', value: fmt(max), ratio: 1.0, barColor: AppColors.error),
+              _MetricRow(label: 'P90', value: fmt(p90), ratio: ratio(p90), barColor: AppColors.warning),
+              _MetricRow(label: 'P70', value: fmt(p70), ratio: ratio(p70), barColor: AppColors.toolCall),
+              _MetricRow(label: 'P50', value: fmt(p50), ratio: ratio(p50), barColor: AppColors.statTTFB),
+              _MetricRow(label: '平均', value: fmt(avg), ratio: ratio(avg), barColor: AppColors.primary),
               const SizedBox(height: 8),
-              Text('共 $count 条请求', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              Text('共 $count 条请求', style: const TextStyle(fontSize: 11, color: AppColors.grey)),
             ],
           ),
         ),
@@ -283,7 +284,7 @@ class LogSummaryBar extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.token_outlined, size: 20, color: Colors.purple),
+                    const Icon(Icons.token_outlined, size: 20, color: AppColors.statTokens),
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text('Token 用量统计', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
@@ -296,29 +297,29 @@ class LogSummaryBar extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                _TokenRow(label: '总输入', value: totalInput, color: Colors.blue),
-                _TokenRow(label: '总输出', value: totalOutput, color: Colors.green),
+                _TokenRow(label: '总输入', value: totalInput, color: AppColors.tokenInput),
+                _TokenRow(label: '总输出', value: totalOutput, color: AppColors.tokenOutput),
                 const Divider(height: 20),
-                _TokenRow(label: '合计', value: totalTokens, color: Colors.purple, bold: true),
+                _TokenRow(label: '合计', value: totalTokens, color: AppColors.statTokens, bold: true),
                 if (hasCache) ...[
                   const SizedBox(height: 12),
-                  Text('缓存用量', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+                  Text('缓存用量', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.greyDark)),
                   const SizedBox(height: 6),
                   if (totalCacheCreation > 0)
-                    _TokenRow(label: '缓存写入', value: totalCacheCreation, color: Colors.orange),
+                    _TokenRow(label: '缓存写入', value: totalCacheCreation, color: AppColors.tokenCacheCreation),
                   if (totalCacheRead > 0) ...[
-                    _TokenRow(label: '缓存命中', value: totalCacheRead, color: Colors.teal),
+                    _TokenRow(label: '缓存命中', value: totalCacheRead, color: AppColors.tokenCacheRead),
                     if (totalInput > 0)
                       _TokenRow(
                         label: '命中率',
                         value: totalCacheRead,
-                        color: Colors.teal,
+                        color: AppColors.tokenCacheRead,
                         suffix: '${(totalCacheRead / totalInput * 100).toStringAsFixed(1)}%',
                       ),
                   ],
                 ],
                 const SizedBox(height: 8),
-                Text('共 $entryCount 条请求包含 Token 数据', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                Text('共 $entryCount 条请求包含 Token 数据', style: const TextStyle(fontSize: 11, color: AppColors.grey)),
               ],
             ),
           ),

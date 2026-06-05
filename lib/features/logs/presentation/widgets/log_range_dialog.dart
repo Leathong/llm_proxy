@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/features/logs/presentation/providers/log_providers.dart';
 
 class LogRangeDialog extends ConsumerStatefulWidget {
@@ -53,7 +54,7 @@ class _LogRangeDialogState extends ConsumerState<LogRangeDialog> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.linear_scale, size: 20, color: Colors.blueGrey),
+                  const Icon(Icons.linear_scale, size: 20, color: AppColors.blueGrey),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text('统计区间',
@@ -70,7 +71,7 @@ class _LogRangeDialogState extends ConsumerState<LogRangeDialog> {
               const SizedBox(height: 16),
               Text(
                 '共 $_total 条，选择统计范围（1 起始）：',
-                style: const TextStyle(fontSize: 13, color: Colors.grey),
+                style: const TextStyle(fontSize: 13, color: AppColors.grey),
               ),
               const SizedBox(height: 12),
               Row(
@@ -163,7 +164,7 @@ class _LogRangeDialogState extends ConsumerState<LogRangeDialog> {
               ),
               Text(
                 '显示 ${_tempStart.toInt() + 1} ~ ${_tempEnd.toInt()}，共 ${(_tempEnd - _tempStart).toInt()} 条',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                style: const TextStyle(fontSize: 12, color: AppColors.grey),
               ),
               const SizedBox(height: 16),
               Row(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 
 /// 缩放为 0.6 的自定义 Switch，解决缩放后样式异常的问题
 class ScaledSwitch extends StatelessWidget {
@@ -47,9 +48,9 @@ class SwitchTile extends StatelessWidget {
       title: title,
       minTileHeight: 0,
       horizontalTitleGap: 0,
-      titleTextStyle: const TextStyle(fontSize: 14, color: Colors.black, fontWeight: .w400),
+      titleTextStyle: const TextStyle(fontSize: 14, color: AppColors.greyDark, fontWeight: .w400),
       subtitle: subtitle,
-      subtitleTextStyle: TextStyle(fontSize: 12, color: Colors.grey[800], fontWeight: FontWeight.w300),
+      subtitleTextStyle: const TextStyle(fontSize: 12, color: AppColors.grey, fontWeight: FontWeight.w300),
       trailing: ScaledSwitch(value: value, onChanged: onChanged),
       onTap: onChanged != null ? () => onChanged!(!value) : null,
     );

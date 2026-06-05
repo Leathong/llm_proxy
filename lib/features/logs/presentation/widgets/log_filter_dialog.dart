@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/features/logs/presentation/providers/log_providers.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_filter_dropdown.dart';
 
@@ -53,7 +54,7 @@ class _LogFilterDialogState extends ConsumerState<LogFilterDialog> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.filter_list, size: 20, color: Colors.blue),
+                  const Icon(Icons.filter_list, size: 20, color: AppColors.primary),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text('过滤日志',

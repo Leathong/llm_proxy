@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 
 /// 对话消息列表
@@ -24,10 +25,10 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (Color roleColor, IconData roleIcon) = switch (message.role) {
-      'user' => (Colors.blue, Icons.person),
-      'assistant' => (Colors.green, Icons.smart_toy),
-      'system' => (Colors.purple, Icons.settings),
-      _ => (Colors.grey, Icons.chat_bubble),
+      'user' => (AppColors.roleUser, Icons.person),
+      'assistant' => (AppColors.roleAssistant, Icons.smart_toy),
+      'system' => (AppColors.roleSystem, Icons.settings),
+      _ => (AppColors.roleDefault, Icons.chat_bubble),
     };
 
     return Container(
@@ -54,7 +55,7 @@ class _MessageBubble extends StatelessWidget {
             Expanded(
               child: Text(
                 _previewText(),
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                style: const TextStyle(fontSize: 12, color: AppColors.grey),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -68,7 +69,7 @@ class _MessageBubble extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.15),
+                  color: AppColors.toolCall.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text('🔧 ${message.toolUses!.length}',
@@ -82,7 +83,7 @@ class _MessageBubble extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.teal.withValues(alpha: 0.15),
+                    color: AppColors.toolResult.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text('📋 ${message.toolResults!.length}',
@@ -126,7 +127,7 @@ class _MessageBubble extends StatelessWidget {
                             Text('点击查看完整内容',
                                 style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.blue
+                                    color: AppColors.primary
                                         .withValues(alpha: 0.6))),
                           ],
                         ],
@@ -171,7 +172,7 @@ class _MessageBubble extends StatelessWidget {
       context,
       title: '${role.toUpperCase()} 消息',
       icon: Icons.chat,
-      iconColor: Colors.blue,
+      iconColor: AppColors.primary,
       content: fullText,
     );
   }
@@ -200,16 +201,16 @@ class ToolUseCard extends StatelessWidget {
         margin: const EdgeInsets.only(top: 8),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.amber.withValues(alpha: 0.05),
+          color: AppColors.toolCall.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.amber.withValues(alpha: 0.2)),
+          border: Border.all(color: AppColors.toolCall.withValues(alpha: 0.2)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.build, size: 14, color: Colors.amber),
+                const Icon(Icons.build, size: 14, color: AppColors.toolCall),
                 const SizedBox(width: 6),
                 Text(toolUse.name,
                     style: const TextStyle(
@@ -217,7 +218,7 @@ class ToolUseCard extends StatelessWidget {
                 const Spacer(),
                 Text(toolUse.id,
                     style:
-                        const TextStyle(color: Colors.grey, fontSize: 10)),
+                        const TextStyle(color: AppColors.grey, fontSize: 10)),
               ],
             ),
             const SizedBox(height: 6),
@@ -230,7 +231,7 @@ class ToolUseCard extends StatelessWidget {
                     fontSize: 10,
                     fontFamily: 'monospace',
                     height: 1.3,
-                    color: Colors.black87),
+                    color: AppColors.greyDark),
               ),
             ),
             if (_wasTruncated) ...[
@@ -238,7 +239,7 @@ class ToolUseCard extends StatelessWidget {
               Text('点击查看完整内容',
                   style: TextStyle(
                       fontSize: 11,
-                      color: Colors.amber.withValues(alpha: 0.7))),
+                      color: AppColors.toolCall.withValues(alpha: 0.7))),
             ],
           ],
         ),
@@ -251,7 +252,7 @@ class ToolUseCard extends StatelessWidget {
       context,
       title: toolUse.name,
       icon: Icons.build,
-      iconColor: Colors.amber,
+      iconColor: AppColors.toolCall,
       content: toolUse.inputFull ?? toolUse.inputPreview ?? '{}',
     );
   }
@@ -271,7 +272,7 @@ class ToolResultCard extends StatelessWidget {
                 context,
                 title: '工具结果 → ${result.toolUseId}',
                 icon: Icons.assignment_returned,
-                iconColor: Colors.teal,
+                iconColor: AppColors.toolResult,
                 content: result.contentFull!,
               )
           : null,
@@ -279,9 +280,9 @@ class ToolResultCard extends StatelessWidget {
         margin: const EdgeInsets.only(top: 8),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.teal.withValues(alpha: 0.05),
+          color: AppColors.toolResult.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.teal.withValues(alpha: 0.2)),
+          border: Border.all(color: AppColors.toolResult.withValues(alpha: 0.2)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,12 +290,12 @@ class ToolResultCard extends StatelessWidget {
             Row(
               children: [
                 const Icon(Icons.assignment_returned,
-                    size: 14, color: Colors.teal),
+                    size: 14, color: AppColors.toolResult),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text('结果 → ${result.toolUseId}',
                       style:
-                          const TextStyle(fontSize: 11, color: Colors.teal),
+                          const TextStyle(fontSize: 11, color: AppColors.toolResult),
                       overflow: TextOverflow.ellipsis),
                 ),
               ],
@@ -302,14 +303,14 @@ class ToolResultCard extends StatelessWidget {
             if (result.contentPreview != null) ...[
               const SizedBox(height: 6),
               SelectableText(result.contentPreview!,
-                  style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                  style: const TextStyle(fontSize: 11, color: AppColors.grey)),
             ],
             if (result.contentFull != null) ...[
               const SizedBox(height: 4),
               Text('点击查看完整内容',
                   style: TextStyle(
                       fontSize: 11,
-                      color: Colors.teal.withValues(alpha: 0.7))),
+                      color: AppColors.toolResult.withValues(alpha: 0.7))),
             ],
           ],
         ),
@@ -341,7 +342,7 @@ void _showDetailDialog(
               decoration: BoxDecoration(
                 border: Border(
                   bottom:
-                      BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+                      BorderSide(color: AppColors.grey.withValues(alpha: 0.2)),
                 ),
               ),
               child: Row(

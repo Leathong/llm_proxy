@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 
 /// 响应内容块列表
@@ -34,10 +35,10 @@ class ResponseContent extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.deepPurple.withValues(alpha: 0.05),
+              color: AppColors.thinking.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                  color: Colors.deepPurple.withValues(alpha: 0.2)),
+                  color: AppColors.thinking.withValues(alpha: 0.2)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -46,14 +47,14 @@ class ResponseContent extends StatelessWidget {
                   children: [
                     Icon(Icons.psychology,
                         size: 14,
-                        color: Colors.deepPurple.withValues(alpha: 0.7)),
+                        color: AppColors.thinking.withValues(alpha: 0.7)),
                     const SizedBox(width: 6),
                     Text('Thinking',
                         style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
                             color:
-                                Colors.deepPurple.withValues(alpha: 0.7))),
+                                AppColors.thinking.withValues(alpha: 0.7))),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -61,7 +62,7 @@ class ResponseContent extends StatelessWidget {
                     style: TextStyle(
                         fontSize: 12,
                         height: 1.5,
-                        color: Colors.grey[700])),
+                        color: AppColors.greyDark)),
               ],
             ),
           );
@@ -83,9 +84,9 @@ class ResponseContent extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.amber.withValues(alpha: 0.05),
+              color: AppColors.toolCall.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: Colors.amber.withValues(alpha: 0.2)),
+              border: Border.all(color: AppColors.toolCall.withValues(alpha: 0.2)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -93,7 +94,7 @@ class ResponseContent extends StatelessWidget {
                 // 工具名称和 ID
                 Row(
                   children: [
-                    const Icon(Icons.build, size: 14, color: Colors.amber),
+                    const Icon(Icons.build, size: 14, color: AppColors.toolCall),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(block.name ?? 'tool_use',
@@ -103,7 +104,7 @@ class ResponseContent extends StatelessWidget {
                     if (block.id != null && block.id!.isNotEmpty)
                       Text(block.id!,
                           style: const TextStyle(
-                              color: Colors.grey, fontSize: 10)),
+                              color: AppColors.grey, fontSize: 10)),
                   ],
                 ),
                 // 输入参数

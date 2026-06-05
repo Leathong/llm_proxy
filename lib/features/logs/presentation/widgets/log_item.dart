@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 import 'package:llm_proxy/features/logs/presentation/widgets/log_detail.dart';
 
@@ -123,14 +124,14 @@ class _LogItemState extends State<LogItem> {
     Color statusColor;
     if (entry.statusCode != null) {
       if (entry.statusCode! >= 200 && entry.statusCode! < 300) {
-        statusColor = Colors.green;
+        statusColor = AppColors.success;
       } else if (entry.statusCode! >= 400) {
-        statusColor = Colors.red;
+        statusColor = AppColors.error;
       } else {
-        statusColor = Colors.orange;
+        statusColor = AppColors.warning;
       }
     } else {
-      statusColor = Colors.grey;
+      statusColor = AppColors.grey;
     }
 
     final messageCount = entry.request?.messages.length ?? 0;
@@ -163,7 +164,7 @@ class _LogItemState extends State<LogItem> {
                 SizedBox(
                   width: 35,
                   child: Text('#${entry.index}',
-                      style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                      style: const TextStyle(color: AppColors.grey, fontSize: 11)),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -182,12 +183,12 @@ class _LogItemState extends State<LogItem> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(entry.method,
                       style: const TextStyle(
-                          color: Colors.blue,
+                          color: AppColors.primary,
                           fontWeight: FontWeight.w600,
                           fontSize: 11)),
                 ),
@@ -202,16 +203,16 @@ class _LogItemState extends State<LogItem> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text('${entry.durationMs}ms',
-                          style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          style: const TextStyle(color: AppColors.grey, fontSize: 12)),
                       if (entry.firstByteMs != null) ...[
                         const SizedBox(width: 4),
                         Text('TTFB ${entry.firstByteMs}ms',
-                            style: const TextStyle(color: Colors.blueGrey, fontSize: 11)),
+                            style: const TextStyle(color: AppColors.blueGrey, fontSize: 11)),
                       ],
                       if (outputSpeed != null) ...[
                         const SizedBox(width: 4),
                         Text('${outputSpeed.toStringAsFixed(1)} tok/s',
-                            style: const TextStyle(color: Colors.teal, fontSize: 11)),
+                            style: const TextStyle(color: AppColors.statTTFB, fontSize: 11)),
                       ],
                     ],
                   ),
@@ -226,37 +227,37 @@ class _LogItemState extends State<LogItem> {
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 200),
                     child: Text(entry.path,
-                        style: const TextStyle(color: Colors.grey, fontSize: 11),
+                        style: const TextStyle(color: AppColors.grey, fontSize: 11),
                         overflow: TextOverflow.ellipsis),
                   ),
                   const SizedBox(width: 8),
                   Text(entry.timestamp,
-                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      style: const TextStyle(color: AppColors.grey, fontSize: 12)),
                   if (entry.model != null) ...[
                     const SizedBox(width: 8),
-                    const Icon(Icons.psychology, size: 14, color: Colors.grey),
+                    const Icon(Icons.psychology, size: 14, color: AppColors.grey),
                     const SizedBox(width: 4),
                     Text(entry.model!,
-                        style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                        style: const TextStyle(color: AppColors.grey, fontSize: 12)),
                   ],
                   const Spacer(),
                   if (entry.request?.tools != null) ...[
-                    const Icon(Icons.build, size: 13, color: Colors.amber),
+                    const Icon(Icons.build, size: 13, color: AppColors.toolCall),
                     const SizedBox(width: 2),
                     Text('${entry.request!.tools!.length}',
                         style:
-                            const TextStyle(color: Colors.amber, fontSize: 11)),
+                            const TextStyle(color: AppColors.toolCall, fontSize: 11)),
                     const SizedBox(width: 6),
                   ],
                   if (messageCount > 0)
                     Text('$messageCount 条消息',
-                        style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                        style: const TextStyle(color: AppColors.grey, fontSize: 11)),
                   if (usage != null) ...[
                     const SizedBox(width: 8),
-                    const Icon(Icons.token, size: 13, color: Colors.grey),
+                    const Icon(Icons.token, size: 13, color: AppColors.grey),
                     const SizedBox(width: 2),
                     Text('${usage.totalInputTokens}→${usage.outputTokens ?? 0}',
-                        style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                        style: const TextStyle(color: AppColors.grey, fontSize: 11)),
                   ],
                 ],
               ),

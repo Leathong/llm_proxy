@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_storage_stats.dart';
 
 class LogStorageStatsDialog extends StatelessWidget {
@@ -63,7 +64,7 @@ class LogStorageStatsDialog extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.grey),
+          Icon(icon, size: 18, color: AppColors.grey),
           const SizedBox(width: 10),
           Text('$label：', style: const TextStyle(fontSize: 14)),
           const Spacer(),

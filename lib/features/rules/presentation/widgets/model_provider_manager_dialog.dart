@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/core/widgets/scaled_switch.dart';
 import 'package:llm_proxy/features/rules/domain/entities/model_provider.dart';
 import 'package:llm_proxy/features/rules/domain/entities/provider_model.dart';
@@ -74,7 +75,7 @@ class _ModelProviderManagerPageState
               child: const Text('取消')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
+            child: const Text('删除', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -222,7 +223,7 @@ class _ModelProviderManagerPageState
     final providerId = provider?.id ?? -1;
     final formatLabel = provider?.format.toUpperCase() ?? '';
     final formatColor =
-        provider?.format == 'anthropic' ? Colors.orange : Colors.green;
+        provider?.format == 'anthropic' ? AppColors.formatAnthropic : AppColors.formatOpenAI;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -238,7 +239,7 @@ class _ModelProviderManagerPageState
                 children: [
                   Icon(
                     isExpanded ? Icons.expand_less : Icons.expand_more,
-                    color: Colors.grey,
+                    color: AppColors.grey,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -256,7 +257,7 @@ class _ModelProviderManagerPageState
                           const SizedBox(height: 2),
                           Text(
                             provider.baseUrl,
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            style: const TextStyle(fontSize: 12, color: AppColors.grey),
                           ),
                           const SizedBox(height: 4),
                           Container(
@@ -296,7 +297,7 @@ class _ModelProviderManagerPageState
                         onPressed: () => _fetchModels(provider),
                       ),
                     IconButton(
-                      icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                      icon: const Icon(Icons.delete, size: 20, color: AppColors.error),
                       tooltip: '删除 Provider',
                       onPressed: () => _deleteProvider(provider),
                     ),
@@ -537,7 +538,7 @@ class _ModelListSection extends ConsumerWidget {
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: Text('暂无模型，请点击上方下载按钮获取模型列表',
-                    style: TextStyle(color: Colors.grey)),
+                    style: TextStyle(color: AppColors.grey)),
               ),
             );
           }
@@ -545,7 +546,7 @@ class _ModelListSection extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('共 ${models.length} 个模型',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  style: const TextStyle(fontSize: 12, color: AppColors.grey)),
               const SizedBox(height: 8),
               ...models.map((model) => Card(
                     margin: const EdgeInsets.only(bottom: 4),
@@ -567,7 +568,7 @@ class _ModelListSection extends ConsumerWidget {
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete,
-                                size: 18, color: Colors.red),
+                                size: 18, color: AppColors.error),
                             onPressed: () => onDeleteModel(model.id),
                           ),
                         ],
@@ -626,7 +627,7 @@ class _ModelPickerDialogState extends State<_ModelPickerDialog> {
             Text(
                 '已添加: ${widget.existingCount} 个模型，'
                 '新发现: ${widget.remoteModels.length} 个模型',
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                style: const TextStyle(fontSize: 12, color: AppColors.grey)),
             const SizedBox(height: 8),
             TextField(
               decoration: const InputDecoration(

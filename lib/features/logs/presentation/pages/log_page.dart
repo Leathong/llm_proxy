@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_stats.dart';
@@ -67,7 +68,7 @@ class _LogPageState extends ConsumerState<LogPage> {
           IconButton(
             icon: Icon(
               Icons.filter_list,
-              color: hasFilter ? Colors.blue : null,
+              color: hasFilter ? AppColors.primary : null,
             ),
             tooltip: hasFilter ? '过滤中 (点击修改)' : '过滤',
             onPressed: () => _showFilterDialog(state),
@@ -151,10 +152,10 @@ class _LogPageState extends ConsumerState<LogPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const Icon(Icons.error_outline, size: 64, color: AppColors.error),
             const SizedBox(height: 16),
             SelectableText(state.error!,
-                style: const TextStyle(color: Colors.red, fontSize: 14)),
+                style: const TextStyle(color: AppColors.error, fontSize: 14)),
           ],
         ),
       );
@@ -203,19 +204,19 @@ class _LogPageState extends ConsumerState<LogPage> {
                       ? const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.list_alt, size: 80, color: Colors.grey),
+                            Icon(Icons.list_alt, size: 80, color: AppColors.grey),
                             SizedBox(height: 20),
                             Text('暂无日志记录',
-                                style: TextStyle(fontSize: 18, color: Colors.grey)),
+                                style: TextStyle(fontSize: 18, color: AppColors.grey)),
                             SizedBox(height: 8),
                             Text('代理请求处理完成后会自动记录到此',
-                                style: TextStyle(fontSize: 14, color: Colors.grey)),
+                                style: TextStyle(fontSize: 14, color: AppColors.grey)),
                           ],
                         )
                       : showLoadMore
                           ? _buildLoadMoreButton(isLoadingMore: state.isLoadingMore)
                           : const Text('没有匹配的日志记录',
-                              style: TextStyle(color: Colors.grey, fontSize: 14)),
+                              style: TextStyle(color: AppColors.grey, fontSize: 14)),
                 ),
         ),
       ],
@@ -257,7 +258,7 @@ class _LogPageState extends ConsumerState<LogPage> {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  Text('条/页', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  Text('条/页', style: TextStyle(fontSize: 12, color: AppColors.grey)),
                   const SizedBox(width: 8),
                   SizedBox(
                     height: 32,

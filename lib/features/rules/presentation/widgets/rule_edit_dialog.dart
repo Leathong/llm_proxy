@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/core/widgets/scaled_switch.dart';
 import 'package:llm_proxy/features/rules/domain/entities/provider_model.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
@@ -261,7 +262,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
         child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))),
       ),
       error: (e, _) => Text('加载模型列表失败: $e',
-          style: const TextStyle(color: Colors.red, fontSize: 12)),
+          style: const TextStyle(color: AppColors.error, fontSize: 12)),
       data: (providerModels) {
         final enabledModels =
             providerModels.where((m) => m.enabled).toList();
@@ -313,7 +314,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                 child: Text(
                   selectedText ?? '请选择...',
                   style: TextStyle(
-                    color: selectedText != null ? null : Colors.grey[600],
+                    color: selectedText != null ? null : AppColors.grey,
                   ),
                 ),
               ),
@@ -322,7 +323,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
               const SizedBox(height: 4),
               Text(
                 '目标模型 ID 和转发地址由 Provider 配置决定',
-                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                style: TextStyle(fontSize: 11, color: AppColors.grey),
               ),
             ],
           ],

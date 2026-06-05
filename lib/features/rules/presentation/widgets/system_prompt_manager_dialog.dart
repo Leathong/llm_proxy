@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/features/rules/domain/entities/system_prompt.dart';
 import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.dart';
 
@@ -53,7 +54,7 @@ class _SystemPromptManagerDialogState
                         ),
                         IconButton(
                           icon: const Icon(Icons.delete, size: 18,
-                              color: Colors.red),
+                              color: AppColors.error),
                           onPressed: () => _deletePrompt(prompt.id),
                         ),
                       ],
@@ -113,7 +114,7 @@ class _SystemPromptManagerDialogState
               child: const Text('取消')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
+            child: const Text('删除', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),

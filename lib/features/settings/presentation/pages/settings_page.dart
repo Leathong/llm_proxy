@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/core/widgets/scaled_switch.dart';
 import 'package:llm_proxy/features/settings/domain/entities/app_settings.dart';
 import 'package:llm_proxy/features/settings/presentation/providers/settings_providers.dart';
@@ -184,7 +185,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 '4. 重新启动需要走代理的客户端/IDE',
               ),
               const SizedBox(height: 16),
-              const Text('注意:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+              const Text('注意:', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.error)),
               const Text('使用 HTTPS 代理时，需将生成的 cert.pem 安装为受信任证书，否则客户端会因证书不受信任而报错。'),
             ],
           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 
 class FilterDropdown extends StatelessWidget {
   final String label;
@@ -21,13 +22,13 @@ class FilterDropdown extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: AppColors.greyLight),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
           Text('$label: ',
-              style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              style: const TextStyle(fontSize: 12, color: AppColors.grey)),
           Expanded(
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String?>(
@@ -57,7 +58,7 @@ class FilterDropdown extends StatelessWidget {
           if (value != null)
             GestureDetector(
               onTap: onClear,
-              child: const Icon(Icons.clear, size: 16, color: Colors.grey),
+              child: const Icon(Icons.clear, size: 16, color: AppColors.grey),
             ),
         ],
       ),

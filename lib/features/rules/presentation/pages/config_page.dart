@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/core/widgets/scaled_switch.dart';
 import 'package:llm_proxy/features/rules/domain/entities/provider_model.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
@@ -165,7 +166,7 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.delete_outline,
-                                      size: 20, color: Colors.red),
+                                      size: 20, color: AppColors.error),
                                   tooltip: '删除规则',
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(
@@ -314,10 +315,10 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
               style: TextStyle(
                 fontSize: 12,
                 color:
-                    level != ReasoningLevel.none ? null : Colors.grey[600],
+                    level != ReasoningLevel.none ? null : AppColors.grey,
               ),
             ),
-            Icon(Icons.arrow_drop_down, size: 18, color: Colors.grey[600]),
+            Icon(Icons.arrow_drop_down, size: 18, color: AppColors.grey),
           ],
         ),
       ),
@@ -345,7 +346,7 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
               ref.read(rulesProvider.notifier).delete(rule.id);
               Navigator.pop(ctx);
             },
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
+            child: const Text('删除', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
