@@ -24,8 +24,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
   late String _customModelId;
   late String _targetModelId;
   late bool _active;
-  late String _thinkingMode;
-  late String _reasoningEffort;
+  late ReasoningLevel _reasoningLevel;
   late bool _convertThinkingToContent;
   late bool? _stream;
   late bool _streamIncludeUsage;
@@ -43,8 +42,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
     _customModelId = widget.rule?.customModelId ?? '';
     _targetModelId = widget.rule?.targetModelId ?? '';
     _active = widget.rule?.active ?? true;
-    _thinkingMode = widget.rule?.thinkingMode ?? '';
-    _reasoningEffort = widget.rule?.reasoningEffort ?? '';
+    _reasoningLevel = ReasoningLevel.fromRule(widget.rule);
     _convertThinkingToContent = widget.rule?.convertThinkingToContent ?? false;
     _stream = widget.rule?.stream;
     _streamIncludeUsage = widget.rule?.streamIncludeUsage ?? true;
@@ -87,8 +85,8 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
       providerModelId: _providerModelId,
       providerModelName: providerModelName,
       active: _active,
-      thinkingMode: _thinkingMode,
-      reasoningEffort: _reasoningEffort,
+      thinkingMode: _reasoningLevel.thinkingMode,
+      reasoningEffort: _reasoningLevel.reasoningEffort,
       convertThinkingToContent: _convertThinkingToContent,
       stream: _stream,
       streamIncludeUsage: _streamIncludeUsage,
@@ -136,34 +134,19 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                 const SizedBox(height: 12),
                 _buildProviderModelSelector(),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: _thinkingMode,
-                  decoration:
-                      const InputDecoration(labelText: '思考模式 (thinking)'),
-                  items: const [
-                    DropdownMenuItem(value: '', child: Text('不注入')),
-                    DropdownMenuItem(
-                        value: 'enabled', child: Text('enabled (开启)')),
-                    DropdownMenuItem(
-                        value: 'disabled', child: Text('disabled (关闭)')),
-                  ],
-                  onChanged: (val) =>
-                      setState(() => _thinkingMode = val ?? ''),
-                  onSaved: (val) => _thinkingMode = val ?? '',
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: _reasoningEffort,
+                DropdownButtonFormField<ReasoningLevel>(
+                  initialValue: _reasoningLevel,
                   decoration: const InputDecoration(
-                      labelText: '思考强度 (reasoning_effort)'),
+                      labelText: '思考深度 (reasoning)'),
                   items: const [
-                    DropdownMenuItem(value: '', child: Text('不注入')),
-                    DropdownMenuItem(value: 'high', child: Text('high')),
-                    DropdownMenuItem(value: 'max', child: Text('max')),
+                    DropdownMenuItem(value: ReasoningLevel.none, child: Text('none (不注入)')),
+                    DropdownMenuItem(value: ReasoningLevel.off, child: Text('off (关闭)')),
+                    DropdownMenuItem(value: ReasoningLevel.high, child: Text('high')),
+                    DropdownMenuItem(value: ReasoningLevel.max, child: Text('max')),
                   ],
                   onChanged: (val) =>
-                      setState(() => _reasoningEffort = val ?? ''),
-                  onSaved: (val) => _reasoningEffort = val ?? '',
+                      setState(() => _reasoningLevel = val ?? ReasoningLevel.none),
+                  onSaved: (val) => _reasoningLevel = val ?? ReasoningLevel.none,
                 ),
                 SwitchTile(
                   title: const Text('将模型思考转写为正常返回'),

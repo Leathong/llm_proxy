@@ -1,5 +1,94 @@
 import 'dart:convert';
 
+/// 思考模式枚举
+enum ThinkingMode {
+  /// 不注入 thinking 参数
+  none(''),
+
+  /// 开启思考
+  enabled('enabled'),
+
+  /// 关闭思考
+  disabled('disabled');
+
+  final String value;
+  const ThinkingMode(this.value);
+
+  /// 从字符串解析，非法值回退到 none
+  static ThinkingMode fromString(String s) {
+    return ThinkingMode.values.firstWhere(
+      (e) => e.value == s,
+      orElse: () => ThinkingMode.none,
+    );
+  }
+}
+
+/// 思考强度枚举
+enum ReasoningEffort {
+  /// 不注入 reasoning_effort 参数
+  none(''),
+
+  /// 高强度
+  high('high'),
+
+  /// 最高强度
+  max('max');
+
+  final String value;
+  const ReasoningEffort(this.value);
+
+  /// 从字符串解析，非法值回退到 none
+  static ReasoningEffort fromString(String s) {
+    return ReasoningEffort.values.firstWhere(
+      (e) => e.value == s,
+      orElse: () => ReasoningEffort.none,
+    );
+  }
+}
+
+/// 思考深度合并枚举（thinkingMode + reasoningEffort）
+enum ReasoningLevel {
+  /// 不注入任何 thinking 参数
+  none,
+
+  /// 显式关闭思考
+  off,
+
+  /// 开启，高强度
+  high,
+
+  /// 开启，最高强度
+  max;
+
+  /// 显示标签
+  String get label => name;
+
+  /// 从 Rule 的 thinkingMode + reasoningEffort 计算合并级别
+  static ReasoningLevel fromRule(Rule? rule) {
+    if (rule == null) return none;
+    if (rule.thinkingMode == ThinkingMode.enabled) {
+      if (rule.reasoningEffort == ReasoningEffort.high) return high;
+      if (rule.reasoningEffort == ReasoningEffort.max) return max;
+    }
+    if (rule.thinkingMode == ThinkingMode.disabled) return off;
+    return none;
+  }
+
+  /// 拆分为 thinkingMode
+  ThinkingMode get thinkingMode => switch (this) {
+        ReasoningLevel.high || ReasoningLevel.max => ThinkingMode.enabled,
+        ReasoningLevel.off => ThinkingMode.disabled,
+        _ => ThinkingMode.none,
+      };
+
+  /// 拆分为 reasoningEffort
+  ReasoningEffort get reasoningEffort => switch (this) {
+        ReasoningLevel.high => ReasoningEffort.high,
+        ReasoningLevel.max => ReasoningEffort.max,
+        _ => ReasoningEffort.none,
+      };
+}
+
 class Rule {
   final int id;
   final String name;
@@ -9,8 +98,8 @@ class Rule {
   final int? providerModelId;
   final String providerModelName;
   final bool active;
-  final String thinkingMode;
-  final String reasoningEffort;
+  final ThinkingMode thinkingMode;
+  final ReasoningEffort reasoningEffort;
   final bool convertThinkingToContent;
   final int? systemPromptId;
   final bool? stream; // 是否启用流式响应，null 表示不覆盖请求体中的 stream
@@ -30,8 +119,8 @@ class Rule {
     this.providerModelId,
     this.providerModelName = '',
     this.active = true,
-    this.thinkingMode = '',
-    this.reasoningEffort = '',
+    this.thinkingMode = ThinkingMode.none,
+    this.reasoningEffort = ReasoningEffort.none,
     this.convertThinkingToContent = false,
     this.systemPromptId,
     this.stream,
@@ -64,8 +153,8 @@ class Rule {
     int? providerModelId,
     String? providerModelName,
     bool? active,
-    String? thinkingMode,
-    String? reasoningEffort,
+    ThinkingMode? thinkingMode,
+    ReasoningEffort? reasoningEffort,
     bool? convertThinkingToContent,
     int? systemPromptId,
     bool? stream,

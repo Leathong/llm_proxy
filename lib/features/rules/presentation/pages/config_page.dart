@@ -282,21 +282,27 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
     );
   }
 
-  /// 思考深度（reasoningEffort）紧凑下拉选择器
+  /// 思考深度（合并 thinkingMode + reasoningEffort）紧凑下拉选择器
   Widget _buildReasoningEffortDropdown(Rule rule) {
-    return PopupMenuButton<String>(
+    final level = ReasoningLevel.fromRule(rule);
+
+    return PopupMenuButton<ReasoningLevel>(
       offset: const Offset(0, 24),
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(maxWidth: 200),
       itemBuilder: (_) => const [
-        PopupMenuItem(value: '', child: Text('不注入')),
-        PopupMenuItem(value: 'high', child: Text('high')),
-        PopupMenuItem(value: 'max', child: Text('max')),
+        PopupMenuItem(value: ReasoningLevel.none, child: Text('none')),
+        PopupMenuItem(value: ReasoningLevel.off, child: Text('off')),
+        PopupMenuItem(value: ReasoningLevel.high, child: Text('high')),
+        PopupMenuItem(value: ReasoningLevel.max, child: Text('max')),
       ],
       onSelected: (val) {
-        ref
-            .read(rulesProvider.notifier)
-            .updateRule(rule.copyWith(reasoningEffort: val));
+        ref.read(rulesProvider.notifier).updateRule(
+              rule.copyWith(
+                thinkingMode: val.thinkingMode,
+                reasoningEffort: val.reasoningEffort,
+              ),
+            );
       },
       child: Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -304,11 +310,11 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              _reasoningEffortLabel(rule.reasoningEffort),
+              level.label,
               style: TextStyle(
                 fontSize: 12,
                 color:
-                    rule.reasoningEffort.isNotEmpty ? null : Colors.grey[600],
+                    level != ReasoningLevel.none ? null : Colors.grey[600],
               ),
             ),
             Icon(Icons.arrow_drop_down, size: 18, color: Colors.grey[600]),
@@ -316,17 +322,6 @@ class _ConfigPageState extends ConsumerState<ConfigPage>
         ),
       ),
     );
-  }
-
-  String _reasoningEffortLabel(String effort) {
-    switch (effort) {
-      case 'high':
-        return 'high';
-      case 'max':
-        return 'max';
-      default:
-        return '不注入';
-    }
   }
 
   void _showRuleDialog({Rule? rule}) {

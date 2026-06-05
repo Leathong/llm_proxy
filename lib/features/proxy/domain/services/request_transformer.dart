@@ -114,17 +114,18 @@ void _injectThinking(
   void Function(String message)? onLog,
 ) {
   // 使用规则中的 thinking 配置
-  if (rule.thinkingMode.isNotEmpty) {
-    bodyJson['thinking'] = {'type': rule.thinkingMode};
-    final enableThinking = rule.thinkingMode == "enabled";
+  if (rule.thinkingMode != ThinkingMode.none) {
+    bodyJson['thinking'] = {'type': rule.thinkingMode.value};
+    final enableThinking = rule.thinkingMode == ThinkingMode.enabled;
     bodyJson['extra_body'] = {'enable_thinking': enableThinking};
     bodyJson['enable_thinking'] = enableThinking;
-    onLog?.call('注入 thinking: ${rule.thinkingMode}');
+    onLog?.call('注入 thinking: ${rule.thinkingMode.value}');
   }
 
-  if (rule.thinkingMode == 'enabled' && rule.reasoningEffort.isNotEmpty) {
-    bodyJson['reasoning_effort'] = rule.reasoningEffort;
-    onLog?.call('注入 reasoning_effort: ${rule.reasoningEffort}');
+  if (rule.thinkingMode == ThinkingMode.enabled &&
+      rule.reasoningEffort != ReasoningEffort.none) {
+    bodyJson['reasoning_effort'] = rule.reasoningEffort.value;
+    onLog?.call('注入 reasoning_effort: ${rule.reasoningEffort.value}');
   }
 }
 
