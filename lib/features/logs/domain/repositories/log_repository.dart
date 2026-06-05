@@ -33,7 +33,8 @@ abstract class LogRepository {
   Stream<LogChangeEvent> get changeStream;
 
   Future<int> get logCount;
-  Future<LogEntry?> getLog(int id);
+  /// 获取单条日志，[withBody] 为 true 时同时返回原始 requestBody/responseBody（已解压）
+  Future<LogEntry?> getLog(int id, {bool withBody = false});
   Future<List<LogEntry>> getLogs({
     int? offset,
     int? limit,
@@ -50,6 +51,9 @@ abstract class LogRepository {
     int? cursor,
   });
   Future<List<LogEntry>> getRange(int start, int end);
+
+  /// 批量获取带原始 body 的日志（用于导出）
+  Future<List<LogEntry>> getLogsWithBody(List<int> ids);
 
   Future<int> addLog(LogEntry log);
   Future<void> updateLog(LogEntry updatedLog);

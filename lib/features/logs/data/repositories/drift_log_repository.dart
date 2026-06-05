@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:drift/drift.dart' as drift;
 import 'package:llm_proxy/core/database/app_database.dart';
@@ -8,6 +9,31 @@ import 'package:llm_proxy/features/logs/domain/entities/log_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_output_entry.dart';
 import 'package:llm_proxy/features/logs/domain/entities/log_storage_stats.dart';
 import 'package:llm_proxy/features/logs/domain/repositories/log_repository.dart';
+
+/// gzip 压缩字符串为 Uint8List
+Uint8List? _compress(String? text) {
+  if (text == null || text.isEmpty) return null;
+  final bytes = utf8.encode(text);
+  return Uint8List.fromList(gzip.encode(bytes));
+}
+
+/// gzip 解压 Uint8List 为字符串。
+/// 兼容旧数据：如果数据不是有效的 gzip 格式（迁移时的旧 TEXT 数据），
+/// 则直接按 UTF-8 解码返回原始文本。
+String? _decompress(Uint8List? data) {
+  if (data == null || data.isEmpty) return null;
+  // 先尝试 gzip 解压
+  try {
+    return utf8.decode(gzip.decode(data));
+  } catch (_) {
+    // 非 gzip 格式，可能是迁移时的旧 TEXT 数据，直接按 UTF-8 解码
+    try {
+      return utf8.decode(data);
+    } catch (_) {
+      return null;
+    }
+  }
+}
 
 class DriftLogRepository implements LogRepository {
   final AppDatabase _db;
@@ -36,8 +62,9 @@ class DriftLogRepository implements LogRepository {
       requestDurationMs: drift.Value(e.requestDurationMs),
       firstByteMs: drift.Value(e.firstByteDurationMs),
       status: drift.Value(logStatusToInt(e.status)),
-      requestBody: drift.Value(e.requestBody),
-      responseBody: drift.Value(e.responseBody),
+      // 入库时 gzip 压缩
+      requestBody: drift.Value(_compress(e.requestBody)),
+      responseBody: drift.Value(_compress(e.responseBody)),
       requestModel: drift.Value(e.parsedRequest?.model),
       requestStream: e.parsedRequest?.stream != null
           ? drift.Value(e.parsedRequest!.stream! ? 1 : 0)
@@ -81,6 +108,7 @@ class DriftLogRepository implements LogRepository {
     );
   }
 
+  /// 从数据库行构建 LogEntry（不解压 body，body 字段设为 null）
   LogEntry _rowToEntry(ProxyLog r) {
     FileLogRequest? parsedReq;
     if (r.requestMessagesJson != null || r.requestSystemPrompt != null) {
@@ -172,19 +200,32 @@ class DriftLogRepository implements LogRepository {
       requestDurationMs: r.requestDurationMs ?? 0,
       firstByteDurationMs: r.firstByteMs,
       status: logStatusFromInt(r.status),
-      requestBody: r.requestBody,
-      responseBody: r.responseBody,
+      // 常规列表查询不解压 body，设为 null
+      requestBody: null,
+      responseBody: null,
       parsedRequest: parsedReq,
       parsedResponse: parsedResp,
     );
   }
 
+  /// 从自定义查询行构建 LogEntry（含 body 解压）
+  LogEntry _rowToEntryWithBody(ProxyLog r) {
+    final entry = _rowToEntry(r);
+    return entry.copyWith(
+      requestBody: _decompress(r.requestBody),
+      responseBody: _decompress(r.responseBody),
+    );
+  }
+
   @override
-  Future<LogEntry?> getLog(int id) async {
+  Future<LogEntry?> getLog(int id, {bool withBody = false}) async {
     final rows = await (_db.select(_db.proxyLogs)
           ..where((t) => t.id.equals(id)))
         .get();
     if (rows.isEmpty) return null;
+    if (withBody) {
+      return _rowToEntryWithBody(rows.first);
+    }
     return _rowToEntry(rows.first);
   }
 
@@ -269,6 +310,15 @@ class DriftLogRepository implements LogRepository {
           ..orderBy([(t) => drift.OrderingTerm(expression: t.id)]))
         .get();
     return rows.map(_rowToEntry).toList();
+  }
+
+  @override
+  Future<List<LogEntry>> getLogsWithBody(List<int> ids) async {
+    if (ids.isEmpty) return [];
+    final rows = await (_db.select(_db.proxyLogs)
+          ..where((t) => t.id.isIn(ids)))
+        .get();
+    return rows.map(_rowToEntryWithBody).toList();
   }
 
   @override

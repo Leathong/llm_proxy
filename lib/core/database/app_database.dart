@@ -126,9 +126,9 @@ class ProxyLogs extends Table {
   IntColumn get firstByteMs => integer().nullable()();
   IntColumn get status => integer()();
 
-  // 原始 body（用于导出 .log 文件）
-  TextColumn get requestBody => text().nullable()();
-  TextColumn get responseBody => text().nullable()();
+  // 原始 body（gzip 压缩后存储，用于导出 .log 文件）
+  BlobColumn get requestBody => blob().nullable()();
+  BlobColumn get responseBody => blob().nullable()();
 
   // 预解析的请求字段
   TextColumn get requestModel => text().nullable()();
@@ -160,7 +160,7 @@ class AppDatabase extends _$AppDatabase {
   String get databaseFilePath => _dbFilePath;
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -181,6 +181,24 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(rules, rules.stream as GeneratedColumn);
             await customStatement('UPDATE "rules" SET "stream" = "stream_old"');
             await customStatement('ALTER TABLE "rules" DROP COLUMN "stream_old"');
+          }
+          // v6: requestBody/responseBody 从 TEXT 改为 BLOB（gzip 压缩存储）
+          // 注意：SQLite 无内置 gzip 函数，旧数据以 TEXT 格式直接转为 BLOB 存储，
+          // 首次读取时 _decompress 会失败（非 gzip 格式），此时返回原始文本。
+          // 下次 updateLog 写入时会自动压缩为新格式。
+          if (from < 6) {
+            await customStatement('ALTER TABLE "proxy_logs" ADD COLUMN "request_body_new" BLOB');
+            await customStatement('ALTER TABLE "proxy_logs" ADD COLUMN "response_body_new" BLOB');
+            // 直接将旧 TEXT 数据复制到 BLOB 列（SQLite 会自动转换）
+            await customStatement('''
+              UPDATE "proxy_logs" SET
+                "request_body_new" = "request_body",
+                "response_body_new" = "response_body"
+            ''');
+            await customStatement('ALTER TABLE "proxy_logs" DROP COLUMN "request_body"');
+            await customStatement('ALTER TABLE "proxy_logs" DROP COLUMN "response_body"');
+            await customStatement('ALTER TABLE "proxy_logs" RENAME COLUMN "request_body_new" TO "request_body"');
+            await customStatement('ALTER TABLE "proxy_logs" RENAME COLUMN "response_body_new" TO "response_body"');
           }
         },
       );

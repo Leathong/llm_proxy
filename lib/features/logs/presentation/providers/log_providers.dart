@@ -464,15 +464,19 @@ class LogNotifier extends Notifier<LogState> {
   }
 
   Future<void> exportLogs(String filePath) async {
+    // 从数据库重新读取带原始 body 的完整日志
+    final ids = state.filteredEntries.map((e) => e.id).toList();
+    if (ids.isEmpty) return;
+    final entries = await _repo.getLogsWithBody(ids);
     await LogFileExporter.exportToFile(
       filePath: filePath,
-      entries: state.filteredEntries,
+      entries: entries,
     );
   }
 
   /// 导出单条日志的原始内容（从数据库读取 requestBody/responseBody）
   Future<void> exportSingleLog(int entryId, String filePath) async {
-    final entry = await _repo.getLog(entryId);
+    final entry = await _repo.getLog(entryId, withBody: true);
     if (entry == null) return;
     await LogFileExporter.exportToFile(
       filePath: filePath,
