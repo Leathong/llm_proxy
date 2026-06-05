@@ -448,7 +448,6 @@ class LogNotifier extends Notifier<LogState> {
       displayEntries: const [],
       stats: null,
       hasMore: true,
-      totalCount: 0,
       clearRange: true,
       clearError: true,
     );
