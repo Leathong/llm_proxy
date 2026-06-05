@@ -57,14 +57,14 @@ class AppColors {
   static const Color blueGrey = Color(0xFF6E7A8A);
 
   /// 柔和白（用于深色背景上的前景文字/图标，比纯白更柔和）
-  static const Color whiteSoft = Color(0xFFF0F0F0);
+  static const Color whiteSoft = Color(0xFFFBFBFB);
 
   // ── 背景色 ──
   /// 页面背景色（macOS 窗口背景）
   static const Color background = Color(0xFFF2F2F7);
 
   /// 卡片 / 容器背景色
-  static const Color surface = Color(0xFFFFFFFF);
+  static const Color surface = whiteSoft;
 
   /// 侧边栏背景色（macOS 侧边栏风格）
   static const Color sidebarBackground = Color(0xFFF2F2F7);
