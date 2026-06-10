@@ -202,8 +202,8 @@ class LogNotifier extends Notifier<LogState> {
     }
   }
 
-  bool get _isFilterOrRangeActive =>
-      !state.filter.isEmpty ||
+  bool get _shouldSkipUpdate =>
+      // !state.filter.isEmpty ||
       state.rangeStart != null ||
       state.rangeEnd != null;
 
@@ -212,7 +212,7 @@ class LogNotifier extends Notifier<LogState> {
       _reloadAll();
       return;
     }
-    if (_isFilterOrRangeActive) return;
+    if (_shouldSkipUpdate) return;
     try {
       final newLog = await _repo.getLog(newId);
       if (newLog == null) {
@@ -242,7 +242,7 @@ class LogNotifier extends Notifier<LogState> {
       _reloadAll();
       return;
     }
-    if (_isFilterOrRangeActive) return;
+    if (_shouldSkipUpdate) return;
     try {
       final updatedLog = await _repo.getLog(updatedId);
       if (updatedLog == null) {
