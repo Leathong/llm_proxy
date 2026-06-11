@@ -337,6 +337,9 @@ class RequestRouter {
       );
       logger.log('匹配到规则: ${rule.name}, Provider: ${provider.name}, 模型: $targetModelId');
 
+      // 拼接 rule 名称和实际模型名称，便于日志中区分
+      final displayModel = '$requestedModelId→$targetModelId';
+
       transformer.transform(
         bodyJson,
         rule: rule,
@@ -362,7 +365,7 @@ class RequestRouter {
         logger.log('客户端已断开连接，上游请求已取消');
         unawaited(logRepository.updateLog(LogEntry(
           id: logId, time: startTime, method: request.method,
-          path: request.uri.path, model: requestedModelId,
+          path: request.uri.path, model: displayModel,
           targetEndpoint: targetUrl, statusCode: result.statusCode,
           status: LogStatus.error, error: 'Client disconnected',
           firstByteDurationMs: result.firstByteMs,
@@ -408,7 +411,7 @@ class RequestRouter {
         time: startTime,
         method: request.method,
         path: request.uri.path,
-        model: requestedModelId,
+        model: displayModel,
         targetEndpoint: targetUrl,
         statusCode: result.statusCode,
         error: result.error,
