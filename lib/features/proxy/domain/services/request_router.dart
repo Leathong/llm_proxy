@@ -338,7 +338,7 @@ class RequestRouter {
       logger.log('匹配到规则: ${rule.name}, Provider: ${provider.name}, 模型: $targetModelId');
 
       // 拼接 rule 名称和实际模型名称，便于日志中区分
-      final displayModel = '$requestedModelId→$targetModelId';
+      final displayModel = '$requestedModelId→${provider.name}/$targetModelId';
 
       transformer.transform(
         bodyJson,
