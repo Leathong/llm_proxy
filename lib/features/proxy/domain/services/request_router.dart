@@ -87,6 +87,15 @@ class RequestRouter {
     );
   }
 
+  /// 构建用于日志展示的模型名称，格式：请求模型→Provider名称/实际模型
+  static String buildDisplayModel(
+    String requestedModelId,
+    String providerName,
+    String targetModelId,
+  ) {
+    return '$requestedModelId→$providerName/$targetModelId';
+  }
+
   Future<void> handle(HttpRequest request) async {
     try {
       _setCorsHeaders(request.response);
@@ -167,6 +176,7 @@ class RequestRouter {
   }) async {
     final startTime = DateTime.now();
     var logId = 0;
+    String? requestedModelId;
 
     try {
       if (request.method != 'POST') {
@@ -194,7 +204,7 @@ class RequestRouter {
         return;
       }
 
-      final requestedModelId = bodyJson['model'] as String?;
+      requestedModelId = bodyJson['model'] as String?;
       if (requestedModelId == null) {
         request.response.statusCode = HttpStatus.badRequest;
         request.response.write('Missing model parameter');
@@ -321,7 +331,8 @@ class RequestRouter {
         final duration = DateTime.now().difference(startTime).inMilliseconds;
         unawaited(logRepository.updateLog(LogEntry(
           id: logId, time: startTime, method: request.method,
-          path: request.uri.path, model: requestedModelId,
+          path: request.uri.path,
+          model: buildDisplayModel(requestedModelId, provider.name, providerModel.modelId),
           statusCode: HttpStatus.badRequest, status: LogStatus.error, error: errorMsg,
           requestDurationMs: duration,
         )));
@@ -338,7 +349,7 @@ class RequestRouter {
       logger.log('匹配到规则: ${rule.name}, Provider: ${provider.name}, 模型: $targetModelId');
 
       // 拼接 rule 名称和实际模型名称，便于日志中区分
-      final displayModel = '$requestedModelId→${provider.name}/$targetModelId';
+      final displayModel = buildDisplayModel(requestedModelId, provider.name, targetModelId);
 
       transformer.transform(
         bodyJson,
@@ -432,7 +443,8 @@ class RequestRouter {
       if (logId > 0) {
         unawaited(logRepository.updateLog(LogEntry(
           id: logId, time: startTime, method: request.method,
-          path: request.uri.path, statusCode: HttpStatus.internalServerError,
+          path: request.uri.path, model: requestedModelId ?? 'unknown',
+          statusCode: HttpStatus.internalServerError,
           status: LogStatus.error, error: e.toString(),
           requestDurationMs: duration,
         )));
