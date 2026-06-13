@@ -32,10 +32,44 @@ class _ModelProviderManagerPageState
   /// 正在获取模型列表的 provider id，null 表示空闲
   int? _fetchingProviderId;
 
+  /// 是否处于排序模式
+  bool _isReordering = false;
+
+  /// 排序模式下的临时 provider 顺序
+  List<ModelProvider> _reorderedProviders = [];
+
   @override
   void dispose() {
     _modelListService.dispose();
     super.dispose();
+  }
+
+  void _startReordering(List<ModelProvider> providers) {
+    setState(() {
+      _isReordering = true;
+      _expandedProviderId = null;
+      _isEditing = false;
+      _reorderedProviders = List.of(providers);
+    });
+  }
+
+  void _cancelReordering() {
+    setState(() {
+      _isReordering = false;
+      _reorderedProviders = [];
+    });
+  }
+
+  Future<void> _saveReordering() async {
+    await ref
+        .read(modelProvidersProvider.notifier)
+        .updateOrder(_reorderedProviders);
+    if (mounted) {
+      setState(() {
+        _isReordering = false;
+        _reorderedProviders = [];
+      });
+    }
   }
 
   void _toggleExpand(int providerId) {
@@ -171,17 +205,37 @@ class _ModelProviderManagerPageState
       appBar: AppBar(
         title: const Text('管理 Model Provider'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: '添加 Provider',
-            onPressed: () {
-              setState(() {
-                _expandedProviderId = -1; // -1 表示新增模式
-                _isEditing = true;
-                _editFormKey = UniqueKey();
-              });
-            },
-          ),
+          if (!_isReordering) ...[
+            IconButton(
+              icon: const Icon(Icons.reorder),
+              tooltip: '调整顺序',
+              onPressed: providersAsync.asData?.value.isNotEmpty == true
+                  ? () => _startReordering(providersAsync.asData!.value)
+                  : null,
+            ),
+            IconButton(
+              icon: const Icon(Icons.add),
+              tooltip: '添加 Provider',
+              onPressed: () {
+                setState(() {
+                  _expandedProviderId = -1; // -1 表示新增模式
+                  _isEditing = true;
+                  _editFormKey = UniqueKey();
+                });
+              },
+            ),
+          ] else ...[
+            IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: '取消排序',
+              onPressed: _cancelReordering,
+            ),
+            IconButton(
+              icon: const Icon(Icons.done),
+              tooltip: '完成排序',
+              onPressed: _saveReordering,
+            ),
+          ],
         ],
       ),
       body: providersAsync.when(
@@ -190,6 +244,10 @@ class _ModelProviderManagerPageState
         data: (providers) {
           if (providers.isEmpty && _expandedProviderId != -1) {
             return const Center(child: Text('暂无 Provider，请点击右上角 + 添加'));
+          }
+
+          if (_isReordering) {
+            return _buildReorderList();
           }
 
           return ListView(
@@ -211,6 +269,78 @@ class _ModelProviderManagerPageState
             ],
           );
         },
+      ),
+    );
+  }
+
+  /// 排序模式下的可拖拽列表
+  Widget _buildReorderList() {
+    return ReorderableListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _reorderedProviders.length,
+      itemBuilder: (context, index) {
+        final provider = _reorderedProviders[index];
+        return _buildReorderItem(provider);
+      },
+      onReorderItem: (oldIndex, newIndex) {
+        setState(() {
+          final item = _reorderedProviders.removeAt(oldIndex);
+          _reorderedProviders.insert(newIndex, item);
+        });
+      },
+    );
+  }
+
+  /// 排序模式下的 provider 卡片（仅展示基本信息与拖拽手柄）
+  Widget _buildReorderItem(ModelProvider provider) {
+    final formatLabel = provider.format.toUpperCase();
+    final formatColor = provider.format == 'anthropic'
+        ? AppColors.formatAnthropic
+        : AppColors.formatOpenAI;
+
+    return Card(
+      key: ValueKey(provider.id),
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            const Icon(Icons.drag_handle, color: AppColors.grey),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    provider.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    provider.baseUrl,
+                    style: const TextStyle(fontSize: 12, color: AppColors.grey),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: formatColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      formatLabel,
+                      style: TextStyle(fontSize: 10, color: formatColor),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

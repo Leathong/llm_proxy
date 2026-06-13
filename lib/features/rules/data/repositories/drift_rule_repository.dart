@@ -180,7 +180,10 @@ class DriftRuleRepository implements RuleRepository {
   @override
   Future<List<entity.ModelProvider>> getModelProviders() async {
     final rows = await (_db.select(_db.modelProviders)
-          ..orderBy([(e) => OrderingTerm.desc(e.createdAt)]))
+          ..orderBy([
+            (e) => OrderingTerm.asc(e.sortOrder),
+            (e) => OrderingTerm.asc(e.createdAt),
+          ]))
         .get();
     return rows
         .map((e) => entity.ModelProvider(
@@ -189,6 +192,7 @@ class DriftRuleRepository implements RuleRepository {
               baseUrl: e.baseUrl,
               apiKey: e.apiKey,
               format: e.format,
+              sortOrder: e.sortOrder,
             ))
         .toList();
   }
@@ -196,12 +200,20 @@ class DriftRuleRepository implements RuleRepository {
   @override
   Future<entity.ModelProvider> addModelProvider(
       entity.ModelProvider provider) async {
+    // 新 provider 默认排在最后
+    final maxOrderRow = await (_db.select(_db.modelProviders)
+          ..orderBy([(e) => OrderingTerm.desc(e.sortOrder)])
+          ..limit(1))
+        .getSingleOrNull();
+    final nextOrder = (maxOrderRow?.sortOrder ?? -1) + 1;
+
     final id = await _db.into(_db.modelProviders).insert(
           db.ModelProvidersCompanion.insert(
             name: provider.name,
             baseUrl: provider.baseUrl,
             apiKey: Value(provider.apiKey),
             format: Value(provider.format),
+            sortOrder: Value(nextOrder),
           ),
         );
     return entity.ModelProvider(
@@ -210,6 +222,7 @@ class DriftRuleRepository implements RuleRepository {
       baseUrl: provider.baseUrl,
       apiKey: provider.apiKey,
       format: provider.format,
+      sortOrder: nextOrder,
     );
   }
 
@@ -222,6 +235,7 @@ class DriftRuleRepository implements RuleRepository {
       baseUrl: Value(provider.baseUrl),
       apiKey: Value(provider.apiKey),
       format: Value(provider.format),
+      sortOrder: Value(provider.sortOrder),
     ));
   }
 
@@ -340,6 +354,7 @@ class DriftRuleRepository implements RuleRepository {
       baseUrl: e.baseUrl,
       apiKey: e.apiKey,
       format: e.format,
+      sortOrder: e.sortOrder,
     );
   }
 

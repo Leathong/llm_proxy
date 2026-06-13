@@ -115,6 +115,18 @@ class ModelProvidersNotifier extends AsyncNotifier<List<ModelProvider>> {
     await repo.deleteModelProvider(id);
     ref.invalidateSelf();
   }
+
+  /// 批量更新 provider 顺序，仅对实际发生变化的项写数据库
+  Future<void> updateOrder(List<ModelProvider> orderedProviders) async {
+    final repo = ref.read(ruleRepositoryProvider);
+    for (var i = 0; i < orderedProviders.length; i++) {
+      final provider = orderedProviders[i];
+      if (provider.sortOrder != i) {
+        await repo.updateModelProvider(provider.copyWith(sortOrder: i));
+      }
+    }
+    ref.invalidateSelf();
+  }
 }
 
 final modelProvidersProvider =

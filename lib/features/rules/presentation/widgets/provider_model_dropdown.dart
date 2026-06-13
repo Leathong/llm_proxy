@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_proxy/core/theme/app_colors.dart';
+import 'package:llm_proxy/features/rules/domain/entities/model_provider.dart';
 import 'package:llm_proxy/features/rules/domain/entities/provider_model.dart';
 import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.dart';
 
@@ -68,12 +69,13 @@ class ProviderModelDropdown extends ConsumerWidget {
           }
         }
 
-        // 构建分组下拉菜单项
+        // 构建分组下拉菜单项，按 provider 的 sortOrder 顺序渲染
         final menuItems = _buildMenuItems(
           context,
           groupedModels,
           providerNameMap,
           providerFormatMap,
+          providers,
         );
 
         // 选中回调
@@ -135,19 +137,21 @@ class ProviderModelDropdown extends ConsumerWidget {
     );
   }
 
-  /// 构建分组下拉菜单项列表
+  /// 构建分组下拉菜单项列表，按 provider 顺序渲染分组
   List<PopupMenuEntry<String>> _buildMenuItems(
     BuildContext context,
     Map<int, List<ProviderModel>> groupedModels,
     Map<int, String> providerNameMap,
     Map<int, String> providerFormatMap,
+    List<ModelProvider> providers,
   ) {
     final items = <PopupMenuEntry<String>>[];
     final primaryColor = Theme.of(context).colorScheme.primary;
 
-    for (final entry in groupedModels.entries) {
-      final providerId = entry.key;
-      final models = entry.value;
+    for (final provider in providers) {
+      final providerId = provider.id;
+      final models = groupedModels[providerId];
+      if (models == null || models.isEmpty) continue;
       final providerName =
           providerNameMap[providerId] ?? 'Provider #$providerId';
       final format = providerFormatMap[providerId] ?? '';

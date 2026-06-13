@@ -28,6 +28,7 @@ class ModelProviders extends Table {
   TextColumn get baseUrl => text()();
   TextColumn get apiKey => text().withDefault(const Constant(''))();
   TextColumn get format => text().withDefault(const Constant('openai'))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
 }
@@ -160,7 +161,7 @@ class AppDatabase extends _$AppDatabase {
   String get databaseFilePath => _dbFilePath;
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -199,6 +200,12 @@ class AppDatabase extends _$AppDatabase {
             await customStatement('ALTER TABLE "proxy_logs" DROP COLUMN "response_body"');
             await customStatement('ALTER TABLE "proxy_logs" RENAME COLUMN "request_body_new" TO "request_body"');
             await customStatement('ALTER TABLE "proxy_logs" RENAME COLUMN "response_body_new" TO "response_body"');
+          }
+          // v7: ModelProviders 新增 sort_order 列，旧数据按原主键顺序填充
+          if (from < 7) {
+            await migrator.addColumn(
+                modelProviders, modelProviders.sortOrder as GeneratedColumn);
+            await customStatement('UPDATE "model_providers" SET "sort_order" = "rowid";');
           }
         },
       );

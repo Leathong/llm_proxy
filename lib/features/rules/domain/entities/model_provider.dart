@@ -4,6 +4,7 @@ class ModelProvider {
   final String baseUrl;
   final String apiKey;
   final String format;
+  final int sortOrder;
 
   const ModelProvider({
     required this.id,
@@ -11,6 +12,7 @@ class ModelProvider {
     required this.baseUrl,
     this.apiKey = '',
     this.format = 'openai',
+    this.sortOrder = 0,
   });
 
   ModelProvider copyWith({
@@ -19,6 +21,7 @@ class ModelProvider {
     String? baseUrl,
     String? apiKey,
     String? format,
+    int? sortOrder,
   }) {
     return ModelProvider(
       id: id ?? this.id,
@@ -26,6 +29,7 @@ class ModelProvider {
       baseUrl: baseUrl ?? this.baseUrl,
       apiKey: apiKey ?? this.apiKey,
       format: format ?? this.format,
+      sortOrder: sortOrder ?? this.sortOrder,
     );
   }
 }
