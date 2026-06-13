@@ -368,6 +368,19 @@ class RequestRouter {
         bodyBytes: newBodyBytes,
         endpointApiKey: apiKey,
         convertThinkingToContent: rule.convertThinkingToContent,
+        onFirstByte: (firstByteMs) {
+          // 首字节返回后立即更新日志，让用户尽早看到 TTFB 信息
+          unawaited(logRepository.updateLog(LogEntry(
+            id: logId,
+            time: startTime,
+            method: request.method,
+            path: request.uri.path,
+            model: displayModel,
+            targetEndpoint: targetUrl,
+            status: LogStatus.pending,
+            firstByteDurationMs: firstByteMs,
+          )));
+        },
       );
 
       final duration = DateTime.now().difference(startTime).inMilliseconds;

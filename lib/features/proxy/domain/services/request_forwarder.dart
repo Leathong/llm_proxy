@@ -48,12 +48,14 @@ class RequestForwarder {
   /// 当客户端断开连接时，会立即取消上游请求以节省资源
   /// SSE 流式响应会逐块透传给客户端，不再缓冲全部数据
   /// [convertThinkingToContent] 为 true 时将 thinking/reasoning 内容转写为普通 content
+  /// [onFirstByte] 收到首个响应 chunk 时回调，参数为首字节耗时（毫秒）
   Future<ForwardResult> forward({
     required HttpRequest clientRequest,
     required String targetUrl,
     required List<int> bodyBytes,
     required String? endpointApiKey,
     bool convertThinkingToContent = false,
+    void Function(int firstByteMs)? onFirstByte,
   }) async {
     final uri = Uri.parse(targetUrl);
     final client = _getClient(uri.host);
@@ -126,8 +128,11 @@ class RequestForwarder {
       await for (final chunk in targetResponse) {
         if (clientDisconnected) break;
 
-        // 记录首字节耗时
-        firstByteMs ??= DateTime.now().difference(forwardStartTime).inMilliseconds;
+        // 记录首字节耗时，并在首次收到数据时触发回调
+        if (firstByteMs == null) {
+          firstByteMs = DateTime.now().difference(forwardStartTime).inMilliseconds;
+          onFirstByte?.call(firstByteMs);
+        }
 
         var chunkStr = utf8.decode(chunk, allowMalformed: true);
         if (convertThinkingToContent) {
