@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_proxy/core/theme/app_colors.dart';
 import 'package:llm_proxy/core/widgets/scaled_switch.dart';
+import 'package:llm_proxy/features/rules/domain/entities/model_provider.dart';
 import 'package:llm_proxy/features/rules/domain/entities/provider_model.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
 import 'package:llm_proxy/features/rules/presentation/providers/rules_providers.dart';
@@ -303,6 +304,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
                 groupedModels,
                 providerNameMap,
                 providerFormatMap,
+                providers,
               ),
               child: InputDecorator(
                 decoration: const InputDecoration(
@@ -336,6 +338,7 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
     Map<int, List<ProviderModel>> groupedModels,
     Map<int, String> providerNameMap,
     Map<int, String> providerFormatMap,
+    List<ModelProvider> providers,
   ) {
     showDialog(
       context: context,
@@ -347,9 +350,10 @@ class _RuleEditDialogState extends ConsumerState<RuleEditDialog> {
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: groupedModels.entries.map((entry) {
-                  final providerId = entry.key;
-                  final models = entry.value;
+                children: providers.map((provider) {
+                  final providerId = provider.id;
+                  final models = groupedModels[providerId];
+                  if (models == null || models.isEmpty) return const SizedBox.shrink();
                   final providerName =
                       providerNameMap[providerId] ?? 'Provider #$providerId';
                   final format = providerFormatMap[providerId] ?? '';

@@ -13,6 +13,8 @@ class LogItem extends StatefulWidget {
   final int? entryId;
   /// 导出单条日志的回调
   final void Function(int entryId)? onExportSingle;
+  /// 删除单条日志的回调
+  final void Function(int entryId)? onDelete;
 
   const LogItem({
     super.key,
@@ -22,6 +24,7 @@ class LogItem extends StatefulWidget {
     required this.onToggleExpanded,
     this.entryId,
     this.onExportSingle,
+    this.onDelete,
   });
 
   @override
@@ -281,10 +284,22 @@ class _LogItemState extends State<LogItem> {
             visualDensity: VisualDensity.compact,
           ),
         ),
+        const PopupMenuItem<String>(
+          value: 'delete',
+          child: ListTile(
+            leading: Icon(Icons.delete_outline, color: AppColors.error),
+            title: Text('删除此条日志', style: TextStyle(color: AppColors.error)),
+            subtitle: Text('从数据库中永久删除此条日志记录'),
+            contentPadding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
       ],
     ).then((value) {
       if (value == 'export' && widget.entryId != null) {
         widget.onExportSingle?.call(widget.entryId!);
+      } else if (value == 'delete' && widget.entryId != null) {
+        widget.onDelete?.call(widget.entryId!);
       }
     });
   }

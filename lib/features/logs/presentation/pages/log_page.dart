@@ -196,6 +196,7 @@ class _LogPageState extends ConsumerState<LogPage> {
                       onToggleExpanded: () => _notifier.toggleExpanded(item.entry.id),
                       entryId: item.entry.id,
                       onExportSingle: (entryId) => _exportSingleLog(entryId),
+                      onDelete: (entryId) => _deleteSingleLog(entryId),
                     );
                   },
                 )
@@ -383,6 +384,36 @@ class _LogPageState extends ConsumerState<LogPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('已导出日志 #$entryId 到 $result')),
       );
+    }
+  }
+
+  /// 删除单条日志（带确认对话框）
+  Future<void> _deleteSingleLog(int entryId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除日志'),
+        content: Text('确定要删除日志 #$entryId 吗？此操作不可撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      final notifier = ref.read(logProvider.notifier);
+      await notifier.deleteLog(entryId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已删除日志 #$entryId')),
+        );
+      }
     }
   }
 

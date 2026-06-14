@@ -463,6 +463,11 @@ class LogNotifier extends Notifier<LogState> {
     await _repo.clearLogs();
   }
 
+  /// 删除单条日志
+  Future<void> deleteLog(int id) async {
+    await _repo.deleteLog(id);
+  }
+
   Future<void> exportLogs(String filePath) async {
     // 从数据库重新读取带原始 body 的完整日志
     final ids = state.filteredEntries.map((e) => e.id).toList();
