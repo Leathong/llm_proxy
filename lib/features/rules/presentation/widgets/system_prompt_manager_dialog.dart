@@ -37,8 +37,34 @@ class _SystemPromptManagerDialogState
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 4),
                   child: ListTile(
-                    title: Text(prompt.name,
-                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(prompt.name,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600)),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: prompt.mode == SystemPromptMode.append
+                                ? Colors.blue.shade50
+                                : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            prompt.mode == SystemPromptMode.append ? '追加' : '替换',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: prompt.mode == SystemPromptMode.append
+                                  ? Colors.blue.shade700
+                                  : Colors.grey.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                     subtitle: Text(
                       prompt.content,
                       maxLines: 2,
@@ -85,15 +111,19 @@ class _SystemPromptManagerDialogState
       MaterialPageRoute(
         builder: (ctx) => _SystemPromptEditPage(
           prompt: prompt,
-          onSave: (name, content) async {
+          onSave: (name, content, mode) async {
             if (prompt == null) {
               await ref.read(systemPromptsProvider.notifier).add(
-                    SystemPrompt(id: 0, name: name, content: content),
+                    SystemPrompt(
+                        id: 0, name: name, content: content, mode: mode),
                   );
             } else {
               await ref.read(systemPromptsProvider.notifier).updatePrompt(
                     SystemPrompt(
-                        id: prompt.id, name: name, content: content),
+                        id: prompt.id,
+                        name: name,
+                        content: content,
+                        mode: mode),
                   );
             }
           },
@@ -127,7 +157,8 @@ class _SystemPromptManagerDialogState
 
 class _SystemPromptEditPage extends StatefulWidget {
   final SystemPrompt? prompt;
-  final Future<void> Function(String name, String content) onSave;
+  final Future<void> Function(
+      String name, String content, SystemPromptMode mode) onSave;
 
   const _SystemPromptEditPage({
     required this.onSave,
@@ -143,6 +174,7 @@ class _SystemPromptEditPageState extends State<_SystemPromptEditPage> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _contentController;
+  late SystemPromptMode _mode;
   bool _isSaving = false;
 
   @override
@@ -152,6 +184,7 @@ class _SystemPromptEditPageState extends State<_SystemPromptEditPage> {
         TextEditingController(text: widget.prompt?.name ?? '');
     _contentController =
         TextEditingController(text: widget.prompt?.content ?? '');
+    _mode = widget.prompt?.mode ?? SystemPromptMode.replace;
   }
 
   @override
@@ -168,6 +201,7 @@ class _SystemPromptEditPageState extends State<_SystemPromptEditPage> {
         await widget.onSave(
           _nameController.text,
           _contentController.text,
+          _mode,
         );
         if (!mounted) return;
         Navigator.pop(context);
@@ -216,6 +250,27 @@ class _SystemPromptEditPageState extends State<_SystemPromptEditPage> {
                 ),
                 validator: (val) =>
                     val == null || val.isEmpty ? '请输入名称' : null,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<SystemPromptMode>(
+                initialValue: _mode,
+                decoration: const InputDecoration(
+                  labelText: '模式',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: SystemPromptMode.replace,
+                    child: Text('替换 - 完全替换原系统提示词'),
+                  ),
+                  DropdownMenuItem(
+                    value: SystemPromptMode.append,
+                    child: Text('追加 - 在原系统提示词后追加'),
+                  ),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _mode = val);
+                },
               ),
               const SizedBox(height: 16),
               TextFormField(

@@ -76,6 +76,7 @@ class SystemPrompts extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text()();
   TextColumn get content => text()();
+  TextColumn get mode => text().withDefault(const Constant('replace'))();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
 }
@@ -161,7 +162,7 @@ class AppDatabase extends _$AppDatabase {
   String get databaseFilePath => _dbFilePath;
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -206,6 +207,11 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(
                 modelProviders, modelProviders.sortOrder as GeneratedColumn);
             await customStatement('UPDATE "model_providers" SET "sort_order" = "rowid";');
+          }
+          // v8: SystemPrompts 新增 mode 列，默认 'replace'
+          if (from < 8) {
+            await migrator.addColumn(
+                systemPrompts, systemPrompts.mode as GeneratedColumn);
           }
         },
       );

@@ -141,6 +141,7 @@ class DriftRuleRepository implements RuleRepository {
               id: e.id,
               name: e.name,
               content: e.content,
+              mode: SystemPromptMode.fromValue(e.mode),
             ))
         .toList();
   }
@@ -151,12 +152,14 @@ class DriftRuleRepository implements RuleRepository {
           db.SystemPromptsCompanion.insert(
             name: prompt.name,
             content: prompt.content,
+            mode: Value(prompt.mode.value),
           ),
         );
     return SystemPrompt(
       id: id,
       name: prompt.name,
       content: prompt.content,
+      mode: prompt.mode,
     );
   }
 
@@ -167,6 +170,7 @@ class DriftRuleRepository implements RuleRepository {
         .write(db.SystemPromptsCompanion(
       name: Value(prompt.name),
       content: Value(prompt.content),
+      mode: Value(prompt.mode.value),
     ));
   }
 

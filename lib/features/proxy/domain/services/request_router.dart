@@ -15,6 +15,7 @@ import 'package:llm_proxy/features/proxy/domain/services/request_forwarder.dart'
 import 'package:llm_proxy/features/proxy/domain/services/request_transformer.dart';
 import 'package:llm_proxy/features/proxy/domain/services/rule_matcher.dart';
 import 'package:llm_proxy/features/rules/domain/repositories/rule_repository.dart';
+import 'package:llm_proxy/features/rules/domain/entities/system_prompt.dart';
 
 SseParseResult _parseResponseBodyIsolate(Map<String, String> params) =>
     SseParser.parseResponse(params['body']!, params['path']!);
@@ -260,12 +261,14 @@ class RequestRouter {
 
       // 如果规则关联了 system prompt，加载其内容
       String? systemPromptContent;
+      SystemPromptMode systemPromptMode = SystemPromptMode.replace;
       if (rule.systemPromptId != null) {
         final prompts = await ruleRepository.getSystemPrompts();
         final matched = prompts.where((p) => p.id == rule.systemPromptId).toList();
         if (matched.isNotEmpty) {
           systemPromptContent = matched.first.content;
-          logger.log('已加载 system prompt: ${matched.first.name}');
+          systemPromptMode = matched.first.mode;
+          logger.log('已加载 system prompt: ${matched.first.name} (mode: ${systemPromptMode.value})');
         }
       }
 
@@ -357,6 +360,7 @@ class RequestRouter {
         targetModelId: targetModelId,
         format: providerFormat,
         systemPromptContent: systemPromptContent,
+        systemPromptMode: systemPromptMode,
         onLog: logger.log,
       );
       final modifiedBodyStr = jsonEncode(bodyJson);

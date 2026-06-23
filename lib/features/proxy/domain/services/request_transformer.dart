@@ -1,5 +1,6 @@
 import 'package:llm_proxy/features/proxy/domain/services/provider_format.dart';
 import 'package:llm_proxy/features/rules/domain/entities/rule.dart';
+import 'package:llm_proxy/features/rules/domain/entities/system_prompt.dart';
 
 /// 负责改写请求体：替换 model、注入 thinking/reasoning 参数、替换 system prompt
 class RequestTransformer {
@@ -25,15 +26,16 @@ class RequestTransformer {
     required String targetModelId,
     required ProviderFormat format,
     String? systemPromptContent,
+    SystemPromptMode systemPromptMode = SystemPromptMode.replace,
     void Function(String message)? onLog,
   }) {
     bodyJson['model'] = targetModelId;
 
     switch (format) {
       case ProviderFormat.openai:
-        _transformOpenAI(bodyJson, rule, systemPromptContent, onLog);
+        _transformOpenAI(bodyJson, rule, systemPromptContent, systemPromptMode, onLog);
       case ProviderFormat.anthropic:
-        _transformAnthropic(bodyJson, rule, systemPromptContent, onLog);
+        _transformAnthropic(bodyJson, rule, systemPromptContent, systemPromptMode, onLog);
     }
 
     // 合并自定义参数到请求体中（自定义参数优先级最高，覆盖已存在参数）
@@ -54,22 +56,32 @@ class RequestTransformer {
     Map<String, dynamic> bodyJson,
     Rule rule,
     String? systemPromptContent,
+    SystemPromptMode systemPromptMode,
     void Function(String message)? onLog,
   ) {
     // thinking 注入
     _injectThinking(bodyJson, rule, onLog);
 
-    // system prompt 替换（OpenAI 方式：messages[role=system]）
+    // system prompt 处理（OpenAI 方式：messages[role=system]）
     if (systemPromptContent != null && systemPromptContent.isNotEmpty) {
       final messages = bodyJson['messages'];
       if (messages is List) {
+        final isAppend = systemPromptMode == SystemPromptMode.append;
         for (final msg in messages) {
           if (msg is Map<String, dynamic> && msg['role'] == 'system') {
-            msg['content'] = systemPromptContent;
-            onLog?.call('已替换 OpenAI 格式 system prompt');
-            break;
+            if (isAppend) {
+              msg['content'] = '${msg['content']}\n\n$systemPromptContent';
+              onLog?.call('已追加 OpenAI 格式 system prompt');
+            } else {
+              msg['content'] = systemPromptContent;
+              onLog?.call('已替换 OpenAI 格式 system prompt');
+            }
+            return;
           }
         }
+        // 无 system 消息时，新增一条
+        messages.insert(0, {'role': 'system', 'content': systemPromptContent});
+        onLog?.call('已插入 OpenAI 格式 system prompt');
       }
     }
   }
@@ -79,30 +91,47 @@ class RequestTransformer {
     Map<String, dynamic> bodyJson,
     Rule rule,
     String? systemPromptContent,
+    SystemPromptMode systemPromptMode,
     void Function(String message)? onLog,
   ) {
     // thinking 注入
     _injectThinking(bodyJson, rule, onLog);
 
-    // system prompt 替换（Anthropic 方式：顶层 system 字段）
+    // system prompt 处理（Anthropic 方式：顶层 system 字段）
     if (systemPromptContent != null && systemPromptContent.isNotEmpty) {
+      final isAppend = systemPromptMode == SystemPromptMode.append;
       final system = bodyJson['system'];
       if (system is String) {
-        bodyJson['system'] = systemPromptContent;
-        onLog?.call('已替换 Anthropic 格式 system prompt (string)');
+        if (isAppend) {
+          bodyJson['system'] = '$system\n\n$systemPromptContent';
+          onLog?.call('已追加 Anthropic 格式 system prompt (string)');
+        } else {
+          bodyJson['system'] = systemPromptContent;
+          onLog?.call('已替换 Anthropic 格式 system prompt (string)');
+        }
       } else if (system is List) {
-        bool replaced = false;
+        bool foundText = false;
         for (final block in system) {
           if (block is Map<String, dynamic> && block['type'] == 'text') {
-            block['text'] = systemPromptContent;
-            replaced = true;
+            if (isAppend) {
+              block['text'] = '${block['text']}\n\n$systemPromptContent';
+              onLog?.call('已追加 Anthropic 格式 system prompt (content blocks)');
+            } else {
+              block['text'] = systemPromptContent;
+              onLog?.call('已替换 Anthropic 格式 system prompt (content blocks)');
+            }
+            foundText = true;
             break;
           }
         }
-        if (!replaced) {
+        if (!foundText) {
           system.insert(0, {'type': 'text', 'text': systemPromptContent});
+          onLog?.call('已插入 Anthropic 格式 system prompt (content blocks)');
         }
-        onLog?.call('已替换 Anthropic 格式 system prompt (content blocks)');
+      } else {
+        // 无 system 字段，直接设置
+        bodyJson['system'] = systemPromptContent;
+        onLog?.call('已设置 Anthropic 格式 system prompt');
       }
     }
   }
