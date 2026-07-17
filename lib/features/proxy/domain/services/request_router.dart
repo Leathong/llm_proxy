@@ -110,11 +110,11 @@ class RequestRouter {
       logger.log('收到请求: ${request.method} $path');
 
       if (path.endsWith('/v1/models')) {
-        await _handleModels(request);
+        await _handleModelsRequest(request);
       } else {
         final requestFormat = ProviderFormat.fromPath(path);
         if (requestFormat != null) {
-          await _handleChatCompletions(request, requestFormat: requestFormat);
+          await _handleChatRequest(request, requestFormat: requestFormat);
         } else {
           request.response.statusCode = HttpStatus.notFound;
           request.response.write('Not Found');
@@ -140,7 +140,7 @@ class RequestRouter {
     response.headers.add('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization');
   }
 
-  Future<void> _handleModels(HttpRequest request) async {
+  Future<void> _handleModelsRequest(HttpRequest request) async {
     final startTime = DateTime.now();
     final rules = (await ruleRepository.getRules()).where((r) => r.active).toList();
     final models = rules.map((r) => {
@@ -172,7 +172,7 @@ class RequestRouter {
     ));
   }
 
-  Future<void> _handleChatCompletions(HttpRequest request, {
+  Future<void> _handleChatRequest(HttpRequest request, {
     required ProviderFormat requestFormat,
   }) async {
     final startTime = DateTime.now();
@@ -213,6 +213,8 @@ class RequestRouter {
         return;
       }
 
+      final initialParsedReq = _buildParsedRequest(bodyJson);
+
       logId = await logRepository.addLog(LogEntry(
         id: 0,
         time: startTime,
@@ -220,6 +222,8 @@ class RequestRouter {
         path: request.uri.path,
         model: requestedModelId,
         status: LogStatus.pending,
+        requestBody: bodyString,
+        parsedRequest: initialParsedReq,
       ));
 
       onRequestStart?.call(ActiveRequestInfo(
