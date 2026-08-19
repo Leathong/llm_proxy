@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 /// 转发结果
 class ForwardResult {
@@ -37,6 +38,25 @@ class RequestForwarder {
     return client;
   }
 
+  /// 不应透传给客户端的上游响应头：
+  /// - hop-by-hop 头（connection 等）按 HTTP 规范本就不能转发
+  /// - content-length/content-encoding：HttpClient 默认 autoUncompress 解压 gzip，
+  ///   且 thinking 转写会改写 body，回传的字节与上游头部声明不再一致。
+  ///   若透传 content-length，写入字节多于声明时 SDK 会丢弃数据并报错，
+  ///   少于声明时 close 报错——两者都会导致客户端接收不完整
+  static const _skipResponseHeaders = {
+    'transfer-encoding',
+    'connection',
+    'keep-alive',
+    'proxy-authenticate',
+    'proxy-authorization',
+    'te',
+    'trailer',
+    'upgrade',
+    'content-length',
+    'content-encoding',
+  };
+
   void dispose() {
     for (final client in _clientPool.values) {
       client.close(force: true);
@@ -67,13 +87,22 @@ class RequestForwarder {
       clientDisconnected = true;
     });
 
+    // 上游响应状态码 / 是否已开始向客户端回写 body（用于中途异常的区分处理）
+    var upstreamStatusCode = HttpStatus.badGateway;
+    var bodyWriteStarted = false;
+
     try {
       final targetRequest = await client.postUrl(uri);
 
       // 复制原始 header（排除 host/content-length/authorization）
       clientRequest.headers.forEach((name, values) {
         final lower = name.toLowerCase();
-        if (lower == 'host' || lower == 'content-length' || lower == 'authorization') {
+        if (lower == 'host' ||
+            lower == 'content-length' ||
+            lower == 'authorization' ||
+            // 不透传客户端的 accept-encoding：由 HttpClient 自己声明 gzip，
+            // 避免上游选择 br/deflate 等 HttpClient 不会自动解压的编码
+            lower == 'accept-encoding') {
           return;
         }
         for (var value in values) {
@@ -98,6 +127,7 @@ class RequestForwarder {
       // 记录请求发出时间（用于 TTFB 计算）
       final forwardStartTime = DateTime.now();
       final targetResponse = await targetRequest.close();
+      upstreamStatusCode = targetResponse.statusCode;
 
       // 客户端已断开，无需回写
       if (clientDisconnected) {
@@ -107,10 +137,10 @@ class RequestForwarder {
         );
       }
 
-      // 回写状态码和 header
+      // 回写状态码和 header（跳过与回传 body 不一致或 hop-by-hop 的头）
       clientRequest.response.statusCode = targetResponse.statusCode;
       targetResponse.headers.forEach((name, values) {
-        if (name.toLowerCase() == 'transfer-encoding') return;
+        if (_skipResponseHeaders.contains(name.toLowerCase())) return;
         for (var value in values) {
           clientRequest.response.headers.add(name, value);
         }
@@ -125,21 +155,72 @@ class RequestForwarder {
       // 流式转发：逐块读取上游响应并立即回写给客户端
       final responseBodyBuf = StringBuffer();
       int? firstByteMs;
-      await for (final chunk in targetResponse) {
-        if (clientDisconnected) break;
 
-        // 记录首字节耗时，并在首次收到数据时触发回调
-        if (firstByteMs == null) {
-          firstByteMs = DateTime.now().difference(forwardStartTime).inMilliseconds;
-          onFirstByte?.call(firstByteMs);
-        }
+      void recordFirstByte() {
+        if (firstByteMs != null) return;
+        final ms = DateTime.now().difference(forwardStartTime).inMilliseconds;
+        firstByteMs = ms;
+        onFirstByte?.call(ms);
+      }
 
-        var chunkStr = utf8.decode(chunk, allowMalformed: true);
-        if (convertThinkingToContent) {
-          chunkStr = _convertThinkingChunk(chunkStr);
+      if (!convertThinkingToContent) {
+        // 直通模式：转发原始字节，避免多字节 UTF-8 字符跨 chunk
+        // 被逐块 decode 成替换符导致内容损坏；完整字节留给日志统一解码
+        final bodyBytes = BytesBuilder(copy: false);
+        await for (final chunk in targetResponse) {
+          if (clientDisconnected) break;
+          recordFirstByte();
+          bodyBytes.add(chunk);
+          clientRequest.response.add(chunk);
+          bodyWriteStarted = true;
+          // 立即回刷，防止小 chunk 积压在缓冲区，客户端长时间收不到数据
+          await clientRequest.response.flush();
         }
-        responseBodyBuf.write(chunkStr);
-        clientRequest.response.add(utf8.encode(chunkStr));
+        responseBodyBuf.write(
+          utf8.decode(bodyBytes.takeBytes(), allowMalformed: true),
+        );
+      } else {
+        // 转写模式：有状态 UTF-8 解码 + 跨 chunk 行缓冲，
+        // 保证跨块的字符和 SSE 行都能被正确转写
+        final decodedParts = <String>[];
+        // 注意：不能用 StringConversionSink.withCallback，
+        // 它会累积到 close 才回调一次，流式场景下拿不到中间数据
+        final utf8Sink = const Utf8Decoder(allowMalformed: true)
+            .startChunkedConversion(_ImmediateStringSink(decodedParts.add));
+        var pendingLine = '';
+
+        await for (final chunk in targetResponse) {
+          if (clientDisconnected) break;
+          recordFirstByte();
+          utf8Sink.add(chunk);
+          if (decodedParts.isEmpty) continue;
+          pendingLine += decodedParts.join();
+          decodedParts.clear();
+
+          final lines = pendingLine.split('\n');
+          pendingLine = lines.removeLast(); // 末段可能是不完整的行，留待下次
+          if (lines.isEmpty) continue;
+
+          final out = '${lines.map(_convertSseLine).join('\n')}\n';
+          responseBodyBuf.write(out);
+          clientRequest.response.add(utf8.encode(out));
+          bodyWriteStarted = true;
+          await clientRequest.response.flush();
+        }
+        utf8Sink.close();
+        if (decodedParts.isNotEmpty) {
+          pendingLine += decodedParts.join();
+          decodedParts.clear();
+        }
+        if (pendingLine.isNotEmpty) {
+          final out = _convertSseLine(pendingLine);
+          responseBodyBuf.write(out);
+          if (!clientDisconnected) {
+            clientRequest.response.add(utf8.encode(out));
+            bodyWriteStarted = true;
+            await clientRequest.response.flush();
+          }
+        }
       }
 
       if (clientDisconnected) {
@@ -168,7 +249,30 @@ class RequestForwarder {
         );
       }
 
-      // 转发失败，返回 Bad Gateway
+      // 响应已开始流式回写（headers 已发出），无法再改状态码。
+      // 以 SSE error 事件显式告知客户端出错了再结束，
+      // 避免客户端把被截断的流当成正常完成
+      if (bodyWriteStarted) {
+        try {
+          clientRequest.response.add(utf8.encode(
+            'data: ${jsonEncode({
+              'error': {
+                'message': 'Upstream error: $e',
+                'type': 'proxy_error',
+              }
+            })}\n\n',
+          ));
+          await clientRequest.response.flush();
+        } catch (_) {}
+        try { await clientRequest.response.close(); } catch (_) {}
+
+        return ForwardResult(
+          statusCode: upstreamStatusCode,
+          error: e.toString(),
+        );
+      }
+
+      // 尚未回写任何内容，可以完整返回 Bad Gateway
       String? errorResp;
       try {
         errorResp = jsonEncode({
@@ -181,7 +285,6 @@ class RequestForwarder {
         clientRequest.response.write(errorResp);
         await clientRequest.response.close();
       } catch (_) {
-        // 如果响应头已发送（流式场景中途异常），强制关闭
         try { await clientRequest.response.close(); } catch (_) {}
       }
 
@@ -198,72 +301,71 @@ class RequestForwarder {
     }
   }
 
-  /// 将 SSE chunk 中的 thinking/reasoning 内容转写为普通 content
+  /// 将单行 SSE data 中的 thinking/reasoning 内容转写为普通 content
   /// 支持 OpenAI（delta.reasoning_content → delta.content）和
   /// Anthropic（thinking/thinking_delta → text/text_delta）两种格式
-  String _convertThinkingChunk(String chunk) {
-    final lines = chunk.split('\n');
-    final converted = <String>[];
+  /// [line] 必须是不含换行符的完整行（跨 chunk 行由调用方缓冲拼接）
+  String _convertSseLine(String line) {
+    if (!line.startsWith('data: ')) return line;
 
-    for (final line in lines) {
-      if (!line.startsWith('data: ')) {
-        converted.add(line);
-        continue;
+    final dataStr = line.substring(6).trim();
+    if (dataStr == '[DONE]') return line;
+
+    try {
+      final json = jsonDecode(dataStr) as Map<String, dynamic>;
+
+      // OpenAI 格式：delta.reasoning_content → delta.content
+      final delta = json['choices']?[0]?['delta'];
+      if (delta is Map<String, dynamic> && delta.containsKey('reasoning_content')) {
+        final reasoning = delta['reasoning_content'];
+        delta.remove('reasoning_content');
+        if (reasoning != null && reasoning.toString().isNotEmpty) {
+          delta['content'] = reasoning;
+        }
+        return 'data: ${jsonEncode(json)}';
       }
 
-      final dataStr = line.substring(6).trim();
-      if (dataStr == '[DONE]') {
-        converted.add(line);
-        continue;
+      // Anthropic 格式：content_block_start type:thinking → type:text
+      final contentBlock = json['content_block'];
+      if (contentBlock is Map<String, dynamic> && contentBlock['type'] == 'thinking') {
+        contentBlock['type'] = 'text';
+        // 将 thinking 字段重命名为 text
+        if (contentBlock.containsKey('thinking')) {
+          contentBlock['text'] = contentBlock['thinking'];
+          contentBlock.remove('thinking');
+        }
+        return 'data: ${jsonEncode(json)}';
       }
 
-      try {
-        final json = jsonDecode(dataStr) as Map<String, dynamic>;
-
-        // OpenAI 格式：delta.reasoning_content → delta.content
-        final delta = json['choices']?[0]?['delta'];
-        if (delta is Map<String, dynamic> && delta.containsKey('reasoning_content')) {
-          final reasoning = delta['reasoning_content'];
-          delta.remove('reasoning_content');
-          if (reasoning != null && reasoning.toString().isNotEmpty) {
-            delta['content'] = reasoning;
-          }
-          converted.add('data: ${jsonEncode(json)}');
-          continue;
+      // Anthropic 格式：content_block_delta type:thinking_delta → type:text_delta
+      final deltaBlock = json['delta'];
+      if (deltaBlock is Map<String, dynamic> && deltaBlock['type'] == 'thinking_delta') {
+        deltaBlock['type'] = 'text_delta';
+        if (deltaBlock.containsKey('thinking')) {
+          deltaBlock['text'] = deltaBlock['thinking'];
+          deltaBlock.remove('thinking');
         }
-
-        // Anthropic 格式：content_block_start type:thinking → type:text
-        final contentBlock = json['content_block'];
-        if (contentBlock is Map<String, dynamic> && contentBlock['type'] == 'thinking') {
-          contentBlock['type'] = 'text';
-          // 将 thinking 字段重命名为 text
-          if (contentBlock.containsKey('thinking')) {
-            contentBlock['text'] = contentBlock['thinking'];
-            contentBlock.remove('thinking');
-          }
-          converted.add('data: ${jsonEncode(json)}');
-          continue;
-        }
-
-        // Anthropic 格式：content_block_delta type:thinking_delta → type:text_delta
-        final deltaBlock = json['delta'];
-        if (deltaBlock is Map<String, dynamic> && deltaBlock['type'] == 'thinking_delta') {
-          deltaBlock['type'] = 'text_delta';
-          if (deltaBlock.containsKey('thinking')) {
-            deltaBlock['text'] = deltaBlock['thinking'];
-            deltaBlock.remove('thinking');
-          }
-          converted.add('data: ${jsonEncode(json)}');
-          continue;
-        }
-
-        converted.add(line);
-      } catch (_) {
-        // JSON 解析失败（如 chunk 被截断），原样保留
-        converted.add(line);
+        return 'data: ${jsonEncode(json)}';
       }
+
+      return line;
+    } catch (_) {
+      // JSON 解析失败，原样保留
+      return line;
     }
-
-    return converted.join('\n');
   }
+}
+
+/// 立即回调的 String Sink：每解码出一段字符串就触发回调
+/// （区别于 StringConversionSink.withCallback 会累积到 close 才回调）
+class _ImmediateStringSink implements Sink<String> {
+  final void Function(String chunk) _onChunk;
+
+  _ImmediateStringSink(this._onChunk);
+
+  @override
+  void add(String data) => _onChunk(data);
+
+  @override
+  void close() {}
 }
