@@ -257,7 +257,6 @@ class RequestRouter {
           statusCode: HttpStatus.notFound, status: LogStatus.error, error: errorMsg,
           requestDurationMs: duration,
         )));
-        onRequestComplete?.call(logId);
         return;
       }
 
@@ -278,43 +277,76 @@ class RequestRouter {
 
       // 规则必须关联 providerModelId
       if (rule.providerModelId == null) {
+        final errorMsg = 'Rule "${rule.name}" has no provider model configured';
+        logger.log(errorMsg);
         final errorResp = jsonEncode({
           'error': {
-            'message': 'Rule "${rule.name}" has no provider model configured',
+            'message': errorMsg,
             'type': 'invalid_request_error',
           }
         });
         request.response.statusCode = HttpStatus.internalServerError;
         request.response.write(errorResp);
         await request.response.close();
+
+        final duration = DateTime.now().difference(startTime).inMilliseconds;
+        unawaited(logRepository.updateLog(LogEntry(
+          id: logId, time: startTime, method: request.method,
+          path: request.uri.path, model: requestedModelId,
+          statusCode: HttpStatus.internalServerError,
+          status: LogStatus.error, error: errorMsg,
+          requestDurationMs: duration,
+        )));
         return;
       }
 
       final providerModel = await ruleRepository.getProviderModelById(rule.providerModelId!);
       if (providerModel == null) {
+        final errorMsg = 'Provider model not found for rule: ${rule.name}';
+        logger.log(errorMsg);
         final errorResp = jsonEncode({
           'error': {
-            'message': 'Provider model not found for rule: ${rule.name}',
+            'message': errorMsg,
             'type': 'invalid_request_error',
           }
         });
         request.response.statusCode = HttpStatus.internalServerError;
         request.response.write(errorResp);
         await request.response.close();
+
+        final duration = DateTime.now().difference(startTime).inMilliseconds;
+        unawaited(logRepository.updateLog(LogEntry(
+          id: logId, time: startTime, method: request.method,
+          path: request.uri.path, model: requestedModelId,
+          statusCode: HttpStatus.internalServerError,
+          status: LogStatus.error, error: errorMsg,
+          requestDurationMs: duration,
+        )));
         return;
       }
 
       final provider = await ruleRepository.getModelProviderById(providerModel.providerId);
       if (provider == null) {
+        final errorMsg = 'Model provider not found for rule: ${rule.name}';
+        logger.log(errorMsg);
         final errorResp = jsonEncode({
           'error': {
-            'message': 'Model provider not found for rule: ${rule.name}',
+            'message': errorMsg,
             'type': 'invalid_request_error',
           }
         });
         request.response.statusCode = HttpStatus.internalServerError;
         request.response.write(errorResp);
         await request.response.close();
+
+        final duration = DateTime.now().difference(startTime).inMilliseconds;
+        unawaited(logRepository.updateLog(LogEntry(
+          id: logId, time: startTime, method: request.method,
+          path: request.uri.path, model: requestedModelId,
+          statusCode: HttpStatus.internalServerError,
+          status: LogStatus.error, error: errorMsg,
+          requestDurationMs: duration,
+        )));
         return;
       }
 
@@ -343,7 +375,6 @@ class RequestRouter {
           statusCode: HttpStatus.badRequest, status: LogStatus.error, error: errorMsg,
           requestDurationMs: duration,
         )));
-        onRequestComplete?.call(logId);
         return;
       }
 
@@ -403,7 +434,6 @@ class RequestRouter {
           firstByteDurationMs: result.firstByteMs,
           requestDurationMs: duration,
         )));
-        onRequestComplete?.call(logId);
         return;
       }
 
@@ -457,7 +487,6 @@ class RequestRouter {
       );
 
       unawaited(logRepository.updateLog(updatedEntry));
-      onRequestComplete?.call(logId);
     } catch (e) {
       logger.log('处理请求出错: $e');
       final duration = DateTime.now().difference(startTime).inMilliseconds;
@@ -469,7 +498,6 @@ class RequestRouter {
           status: LogStatus.error, error: e.toString(),
           requestDurationMs: duration,
         )));
-        onRequestComplete?.call(logId);
       }
       try {
         request.response.statusCode = HttpStatus.internalServerError;
@@ -477,6 +505,12 @@ class RequestRouter {
         await request.response.close();
       } catch (err) {
         logger.log('响应关闭异常: $err');
+      }
+    } finally {
+      // 统一兜底：无论请求从哪条分支结束（包括上面提前 return 的错误路径），
+      // 都确保从“进行中的请求”中移除，防止条目永久残留、时长虚涨到数小时
+      if (logId > 0) {
+        onRequestComplete?.call(logId);
       }
     }
   }

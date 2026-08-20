@@ -25,6 +25,12 @@ class ForwardResult {
 
 /// 负责将客户端请求转发到上游 API，并将响应回写给客户端
 class RequestForwarder {
+  /// 上游完全无数据的最长容忍时间。
+  /// 覆盖等待响应头阶段和流式读取阶段的 chunk 间隔：
+  /// 超过该时长没有任何字节，判定上游连接已死（半开），主动断开。
+  /// 注意非流式请求在生成完成前上游本就静默，该值需大于正常生成耗时。
+  static const Duration _upstreamSilenceTimeout = Duration(minutes: 10);
+
   /// 按 host 复用的 HttpClient 连接池
   final Map<String, HttpClient> _clientPool = {};
 
@@ -126,7 +132,14 @@ class RequestForwarder {
 
       // 记录请求发出时间（用于 TTFB 计算）
       final forwardStartTime = DateTime.now();
-      final targetResponse = await targetRequest.close();
+      // 等待响应头同样受静默超时约束：非流式请求在生成完成前上游本就无字节，
+      // 但不能容忍半开连接导致的永久无响应
+      final targetResponse = await targetRequest.close().timeout(
+        _upstreamSilenceTimeout,
+        onTimeout: () => throw TimeoutException(
+          '等待上游响应超过 ${_upstreamSilenceTimeout.inMinutes} 分钟，判定连接已死',
+        ),
+      );
       upstreamStatusCode = targetResponse.statusCode;
 
       // 客户端已断开，无需回写
@@ -163,11 +176,20 @@ class RequestForwarder {
         onFirstByte?.call(ms);
       }
 
+      // 包装上游流：客户端断开时立即取消上游订阅；
+      // 上游超过静默超时无任何数据时抛 TimeoutException，
+      // 防止半开连接让请求永久挂在读取循环里（“进行中”条目残留数小时的根因）
+      final guardedResponse = _guardUpstream(
+        targetResponse,
+        clientDone: clientRequest.response.done,
+        onClientGone: () => clientDisconnected = true,
+      );
+
       if (!convertThinkingToContent) {
         // 直通模式：转发原始字节，避免多字节 UTF-8 字符跨 chunk
         // 被逐块 decode 成替换符导致内容损坏；完整字节留给日志统一解码
         final bodyBytes = BytesBuilder(copy: false);
-        await for (final chunk in targetResponse) {
+        await for (final chunk in guardedResponse) {
           if (clientDisconnected) break;
           recordFirstByte();
           bodyBytes.add(chunk);
@@ -189,7 +211,7 @@ class RequestForwarder {
             .startChunkedConversion(_ImmediateStringSink(decodedParts.add));
         var pendingLine = '';
 
-        await for (final chunk in targetResponse) {
+        await for (final chunk in guardedResponse) {
           if (clientDisconnected) break;
           recordFirstByte();
           utf8Sink.add(chunk);
@@ -299,6 +321,80 @@ class RequestForwarder {
         try { await clientRequest.response.close(); } catch (_) {}
       }
     }
+  }
+
+  /// 包装上游响应流，增加两道保险：
+  /// - 客户端连接关闭（clientDone 完成）时立即取消上游订阅并结束流，
+  ///   避免客户端已断开而代理仍无限期等待上游
+  /// - 上游超过 [_upstreamSilenceTimeout] 完全无数据时抛出 TimeoutException，
+  ///   防止半开连接让转发永久挂起
+  /// onPause/onResume 把背压透传给上游订阅，避免客户端回写慢时数据在内存中堆积
+  Stream<List<int>> _guardUpstream(
+    Stream<List<int>> upstream, {
+    required Future<void> clientDone,
+    required void Function() onClientGone,
+  }) {
+    late StreamController<List<int>> controller;
+    StreamSubscription<List<int>>? sub;
+    Timer? idleTimer;
+    var terminated = false;
+
+    void terminate() {
+      if (terminated) return;
+      terminated = true;
+      idleTimer?.cancel();
+      sub?.cancel();
+      if (!controller.isClosed) {
+        controller.close();
+      }
+    }
+
+    controller = StreamController<List<int>>(
+      onListen: () {
+        void armIdleTimer() {
+          idleTimer?.cancel();
+          idleTimer = Timer(_upstreamSilenceTimeout, () {
+            if (terminated) return;
+            terminated = true;
+            idleTimer = null;
+            if (!controller.isClosed) {
+              controller.addError(TimeoutException(
+                '上游超过 ${_upstreamSilenceTimeout.inMinutes} 分钟无任何数据，判定连接已死',
+              ));
+              controller.close();
+            }
+            sub?.cancel();
+          });
+        }
+
+        armIdleTimer();
+        sub = upstream.listen(
+          (chunk) {
+            if (terminated) return;
+            armIdleTimer();
+            controller.add(chunk);
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (terminated) return;
+            terminated = true;
+            idleTimer?.cancel();
+            if (!controller.isClosed) {
+              controller.addError(error, stackTrace);
+              controller.close();
+            }
+          },
+          onDone: terminate,
+        );
+        unawaited(clientDone.whenComplete(() {
+          onClientGone();
+          terminate();
+        }));
+      },
+      onPause: () => sub?.pause(),
+      onResume: () => sub?.resume(),
+      onCancel: terminate,
+    );
+    return controller.stream;
   }
 
   /// 将单行 SSE data 中的 thinking/reasoning 内容转写为普通 content
